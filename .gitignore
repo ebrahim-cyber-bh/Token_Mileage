@@ -1,0 +1,6 @@
+report.html
+__pycache__/
+*.pyc
+*.bak-*
+ledger.jsonl
+.DS_Store
