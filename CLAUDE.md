@@ -30,6 +30,7 @@ Claude Code sign-in ──► plan_usage.fetch() ──► api.anthropic.com/api
   - `compute()` produces the totals for today, the last 7 days, this month and the forecast.
   - `plan_loop()` runs in a background thread and calls `plan_usage.fetch()`. `render_plan()` draws the bars (`PLAN_KEYS` decides which limits are shown). `fit_card()` resizes the card when the back's height changes.
   - Colours are in `C` (Claude Code palette). Sizes come from `W`, `H`.
+  - `memory()` / `storage()` give free and total RAM and disk (home drive) per OS, with no extra packages. `size_line()` shows them as *used of total* at the bottom right of the front face (`draw_dots()`), in red above 90% used.
 - **plan_usage.py**
   - Reads Claude Code's OAuth sign-in: `$CLAUDE_CONFIG_DIR/.credentials.json` or `~/.claude/.credentials.json`; on macOS, the Keychain item `Claude Code-credentials`.
   - Calls the usage endpoint with `anthropic-beta: oauth-2025-04-20`. The response has keys like `five_hour`, `seven_day`, `seven_day_opus`, each `{utilization, resets_at}`.

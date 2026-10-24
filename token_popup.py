@@ -3,25 +3,26 @@
 
 Front: rolling odometer of every token used on this device, plus one dot per
 open Claude Code terminal (orange pulse = working, green glow = finished;
-hover for the session name, click to see its numbers).
+hover for the session name, shown in the header).
 Back (flip with ⇄): the account's plan usage like /usage (current session and weekly
-limits, % used, reset time), then tokens for this session, today, 7 days, month, forecast.
+limits, % used, reset time). Both faces are the same compact size.
 """
 import json
 import math
 import os
-import socket
 import sys
 import threading
 import time
 import tkinter as tk
 import tkinter.font as tkfont
+import shutil
+import subprocess
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from token_calc import Ledger, claude_dir, owner_name  # noqa: E402
+from token_calc import Ledger, claude_dir  # noqa: E402
 import plan_usage  # noqa: E402
 
 REFRESH_MS = 2000
@@ -57,6 +58,64 @@ def mix(a, b, t):
     a, b = int(a[1:], 16), int(b[1:], 16)
     ch = [round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t) for s in (16, 8, 0)]
     return "#%02x%02x%02x" % tuple(ch)
+
+
+# ---------- memory and storage ----------
+
+GB = 1024 ** 3
+
+
+def memory():
+    """(free bytes, total bytes) of RAM, or None if unknown."""
+    try:
+        if sys.platform.startswith("linux"):
+            info = {}
+            with open("/proc/meminfo") as fh:
+                for line in fh:
+                    k, v = line.split(":", 1)
+                    info[k] = int(v.split()[0]) * 1024
+            return info["MemAvailable"], info["MemTotal"]
+        if sys.platform == "darwin":
+            total = int(subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True).stdout)
+            vm = subprocess.run(["vm_stat"], capture_output=True, text=True).stdout
+            page = int(vm.split("page size of")[1].split()[0])
+            pages = {k.strip(): int(v.strip(" .")) for k, v in
+                     (line.split(":", 1) for line in vm.splitlines()[1:] if ":" in line)}
+            free = sum(pages.get(k, 0) for k in ("Pages free", "Pages inactive", "Pages speculative"))
+            return free * page, total
+        if os.name == "nt":
+            import ctypes
+
+            class MS(ctypes.Structure):
+                _fields_ = [("len", ctypes.c_ulong), ("load", ctypes.c_ulong), ("total", ctypes.c_ulonglong),
+                            ("avail", ctypes.c_ulonglong), ("pt", ctypes.c_ulonglong), ("pa", ctypes.c_ulonglong),
+                            ("vt", ctypes.c_ulonglong), ("va", ctypes.c_ulonglong), ("ve", ctypes.c_ulonglong)]
+            m = MS()
+            m.len = ctypes.sizeof(MS)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m)):
+                return m.avail, m.total
+    except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+def storage():
+    """(free bytes, total bytes) of the drive holding the home folder."""
+    try:
+        u = shutil.disk_usage(Path.home())
+        return u.free, u.total
+    except OSError:
+        return None
+
+
+def size_line(label, pair):
+    if not pair:
+        return f"{label} —", C["mute"]
+    free, total = pair
+    used = total - free
+    color = C["red"] if used > total * 0.90 else C["mute"]
+    tot = f"{total / GB:.1f}" if total < 100 * GB else f"{total / GB:.0f}"
+    return f"{label} {used / GB:.1f} GB used of {tot}", color
 
 
 # ---------- live sessions ----------
@@ -189,7 +248,6 @@ class App:
         self.data = None
         self.sessions = []
         self.shown_total = 0.0
-        self.selected = None          # session shown on the back
         self.hover = None
         self.dot_pos = []
         self.front_up = True
@@ -204,7 +262,7 @@ class App:
         pick_fonts(root)
 
         self.card = tk.Frame(root, bg=C["bg"], width=W, height=H)
-        self.card.pack(padx=12, pady=(12, 4))
+        self.card.pack(padx=12, pady=12)
         self.card.pack_propagate(False)
         self.front = self.build_front()
         self.back = self.build_back()
@@ -215,9 +273,6 @@ class App:
         self.card.configure(width=W, height=H)
         self.front.place(x=0, y=0, relwidth=1, relheight=1)
         self.flip_cv = tk.Canvas(self.card, bg=C["bg"], highlightthickness=0)
-        self.foot = tk.Label(root, text=f"{owner_name()} · {socket.gethostname()}", bg=C["bg"],
-                             fg=C["line"], font=(MONO, 8))
-        self.foot.pack(pady=(0, 8))
 
         threading.Thread(target=self.first_load, daemon=True).start()
         threading.Thread(target=self.plan_loop, daemon=True).start()
@@ -236,10 +291,13 @@ class App:
     def header(self, face, title, sub):
         h = tk.Frame(face, bg=C["panel"], padx=14, pady=10)
         h.pack(fill="x")
-        spark = self.lbl(h, "✻", 15, "orange", True)
+        # Fixed-size box: spinner glyphs differ in width, so a label would shift the title.
+        spark = tk.Canvas(h, width=24, height=24, bg=C["panel"], highlightthickness=0)
+        spark.glyph = spark.create_text(12, 12, text="✻", fill=C["orange"], font=(SANS, 15, "bold"))
         spark.pack(side="left")
         self.lbl(h, f" {title}", 12, "ink", True).pack(side="left")
-        self.lbl(h, f" {sub}", 12, "mute").pack(side="left")
+        spark.sub = self.lbl(h, f" {sub}", 12, "mute")
+        spark.sub.pack(side="left")
         btn = self.lbl(h, "⇄", 15, "mute", True, cursor="hand2")
         btn.pack(side="right")
         btn.bind("<Button-1>", lambda e: self.flip())
@@ -250,25 +308,22 @@ class App:
     def build_front(self):
         f = self.face()
         self.spark_front = self.header(f, "Claude Code", "odometer")
+        self.front_sub = self.spark_front.sub
         self.odo = Odometer(f)
-        self.odo.frame.pack(pady=(4, 2))
-        self.lbl(f, "tokens · all time", 8, "mute", font=MONO).pack()
+        self.odo.frame.pack(pady=(0, 2))
 
         row = tk.Frame(f, bg=C["panel"], padx=14)
-        row.pack(fill="x", pady=(12, 0))
+        row.pack(fill="x", pady=(6, 10))
         self.dots = tk.Canvas(row, height=28, bg=C["panel"], highlightthickness=0)
         self.dots.pack(fill="x")
         self.dots.bind("<Motion>", self.on_hover)
         self.dots.bind("<Leave>", lambda e: self.set_hover(None))
-        self.dots.bind("<Button-1>", self.on_click)
-        self.caption = self.lbl(f, "", 9, "mute", font=MONO, anchor="w", padx=14)
-        self.caption.pack(fill="x")
         return f
 
     def build_back(self):
         f = self.face()
         self.spark_back = self.header(f, "Usage", "")
-        self.plan_name = f.winfo_children()[0].winfo_children()[2]   # the grey sub-title in the header
+        self.plan_name = self.spark_back.sub
         body = tk.Frame(f, bg=C["panel"], padx=14)
         body.pack(fill="both", expand=True, pady=(0, 10))
 
@@ -292,27 +347,6 @@ class App:
             bar.bind("<Configure>", lambda e: self.render_plan())
             self.slots.append({"box": box, "name": name, "pct": pct, "bar": bar, "value": 0.0})
 
-        # Tokens: compact grid under a thin rule.
-        tk.Frame(body, bg=C["line"], height=1).pack(fill="x", pady=(4, 6))
-        head = tk.Frame(body, bg=C["panel"])
-        head.pack(fill="x")
-        self.lbl(head, "TOKENS", 8, "mute", font=MONO).pack(side="left")
-        self.s_title = self.lbl(head, "", 9, "orange", True, anchor="e")
-        self.s_title.pack(side="right")
-        self.s_sub = self.lbl(body, "", 8, "mute", font=MONO, anchor="e")
-        self.s_sub.pack(fill="x")
-        grid = tk.Frame(body, bg=C["panel"])
-        grid.pack(fill="x", pady=(2, 0))
-        grid.columnconfigure(1, weight=1)
-        grid.columnconfigure(3, weight=1)
-        self.rows = {}
-        cells = (("session", "This session"), ("today", "Today"), ("week", "Last 7 days"),
-                 ("month", "This month"), ("next7", "Next 7 days"))
-        for i, (key, name) in enumerate(cells):
-            r, c = divmod(i, 2)
-            self.lbl(grid, name, 9, "mute").grid(row=r, column=c * 2, sticky="w", padx=(0 if c == 0 else 12, 6))
-            self.rows[key] = self.lbl(grid, "—", 10, "ink", True, MONO)
-            self.rows[key].grid(row=r, column=c * 2 + 1, sticky="e")
         return f
 
     # ---------- data ----------
@@ -371,12 +405,12 @@ class App:
             cv.create_rectangle(0, 1, max(3, w * pct / 100), 7, fill=color, outline="")
 
     def tick(self):
+        self.stats = [size_line("RAM ", memory()), size_line("Disk", storage())]
         if self.ledger:
             self.ledger.scan()
             recs = self.ledger.snapshot()
             self.data = compute(recs, datetime.now().astimezone())
             self.sessions = live_sessions(recs)
-            self.render_back()
             if self.hover is None:
                 self.set_hover(None)
         self.root.after(REFRESH_MS, self.tick)
@@ -390,54 +424,16 @@ class App:
         proj = (s or {}).get("cwd") or self.data["project"].get(sid, "") if self.data else ""
         return Path(proj).name or proj or sid[:8]
 
-    def project_of(self, sid, s=None):
-        p = self.data["project"].get(sid) if self.data else None
-        if not p and s:
-            home = str(Path.home())
-            p = "~" + s["cwd"][len(home):] if s["cwd"].startswith(home) else s["cwd"]
-        return p or ""
-
-    def current_sid(self):
-        if self.selected:
-            return self.selected
-        busy = [s for s in self.sessions if s["busy"]]
-        if busy:
-            return busy[-1]["sid"]
-        if self.data and self.data["last"]:
-            return self.data["last"]["session"]
-        return self.sessions[-1]["sid"] if self.sessions else None
-
-    def render_back(self):
-        d = self.data
-        sid = self.current_sid()
-        live = next((s for s in self.sessions if s["sid"] == sid), None)
-        state = "working" if live and live["busy"] else "finished" if live else "closed"
-        self.s_title.configure(text=self.title_of(sid, live) if sid else "No session yet",
-                               fg=C["orange"] if state == "working" else C["green"] if state == "finished" else C["ink"])
-        self.s_sub.configure(text=f"{self.project_of(sid, live)} · {state}" if sid else "")
-        vals = {"session": d["session"].get(sid, 0), "today": d["today"], "week": d["week"],
-                "month": d["month"], "next7": d["next7"]}
-        for k, v in vals.items():
-            self.rows[k].configure(text=full(v))
-
-    # ---------- dots ----------
     def set_hover(self, sid):
+        """Show the hovered session's name in the header, in place of "odometer"."""
         self.hover = sid
-        if sid:
-            s = next((x for x in self.sessions if x["sid"] == sid), None)
-            if s:
-                tok = self.data["session"].get(sid, 0) if self.data else 0
-                state = "working" if s["busy"] else "finished"
-                self.caption.configure(text=f"{self.title_of(sid, s)[:40]} · {full(tok)} · {state}",
-                                       fg=C["orange"] if s["busy"] else C["green"])
-                return
-        busy = sum(s["busy"] for s in self.sessions)
-        done = len(self.sessions) - busy
-        if not self.sessions:
-            text = "no Claude Code terminals open"
+        s = next((x for x in self.sessions if x["sid"] == sid), None) if sid else None
+        if s:
+            name = self.title_of(sid, s)
+            name = name if len(name) <= 24 else name[:23] + "…"
+            self.front_sub.configure(text=f" {name}", fg=C["orange"] if s["busy"] else C["green"])
         else:
-            text = " · ".join(p for p in (f"{busy} working" if busy else "", f"{done} finished" if done else "") if p)
-        self.caption.configure(text=text, fg=C["mute"])
+            self.front_sub.configure(text=" odometer", fg=C["mute"])
 
     def dot_at(self, x, y):
         for sx, sid in self.dot_pos:
@@ -450,18 +446,15 @@ class App:
         if sid != self.hover:
             self.set_hover(sid)
 
-    def on_click(self, e):
-        sid = self.dot_at(e.x, e.y)
-        if sid:
-            self.selected = sid
-            self.render_back()
-            self.flip()
-
     def draw_dots(self, phase):
         cv = self.dots
         cv.delete("all")
         self.dot_pos = []
         cv.create_text(0, 14, text="SESSIONS", anchor="w", fill=C["mute"], font=(MONO, 8, "bold"))
+        edge = right = cv.winfo_width()
+        for i, (text, color) in enumerate(getattr(self, "stats", [])):
+            item = cv.create_text(edge, 7 + 14 * i, text=text, anchor="e", fill=color, font=(MONO, 8))
+            right = min(right, cv.bbox(item)[0])
         x = 84
         for s in self.sessions:
             color = C["orange"] if s["busy"] else C["green"]
@@ -477,7 +470,7 @@ class App:
             cv.create_oval(x - core, 14 - core, x + core, 14 + core, fill=color, outline="")
             self.dot_pos.append((x, s["sid"]))
             x += 26
-            if x > W - 30:
+            if x > right - 14:
                 break
 
     # ---------- animation ----------
@@ -497,15 +490,13 @@ class App:
         else:
             glyph, color = "✻", C["green"] if self.sessions else C["mute"]
         for sp in (self.spark_front, self.spark_back):
-            sp.configure(text=glyph, fg=color)
+            sp.itemconfigure(sp.glyph, text=glyph, fill=color)
         self.root.after(FRAME_MS, self.animate)
 
     def flip(self):
         if self.flipping:
             return
         self.flipping = True
-        if self.front_up and self.data:
-            self.render_back()
         cv = self.flip_cv
         cv.place(x=0, y=0, relwidth=1, relheight=1)
         tk.Misc.tkraise(cv)
@@ -534,8 +525,6 @@ class App:
             else:
                 cv.place_forget()
                 self.front_up = not self.front_up
-                if self.front_up:
-                    self.selected = None
                 self.flipping = False
 
         frame(0)
