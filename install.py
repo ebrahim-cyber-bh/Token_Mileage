@@ -50,10 +50,10 @@ StartupWMClass=Tk
 """
     menu = Path.home() / ".local/share/applications/claude-odometer.desktop"
     menu.parent.mkdir(parents=True, exist_ok=True)
-    menu.write_text(entry)
+    menu.write_text(entry, encoding="utf-8")
     desk = desktop_dir() / "claude-odometer.desktop"
     desk.parent.mkdir(parents=True, exist_ok=True)
-    desk.write_text(entry)
+    desk.write_text(entry, encoding="utf-8")
     for p in (menu, desk):
         p.chmod(0o755)
     # GNOME only launches desktop icons that are marked as trusted.
@@ -85,7 +85,7 @@ def main():
     args = ap.parse_args()
     if args.owner:
         cfg = data_dir() / "config.json"
-        cfg.write_text(json.dumps({"owner": args.owner}))
+        cfg.write_text(json.dumps({"owner": args.owner}), encoding="utf-8")
         print(f"Owner set to {args.owner}")
     made = windows() if sys.platform == "win32" else mac() if sys.platform == "darwin" else linux()
     for p in made:

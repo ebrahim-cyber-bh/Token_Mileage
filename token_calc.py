@@ -60,7 +60,7 @@ def data_dir():
 def owner_name():
     """Name shown on the reports: config file, env var, git name, then OS user."""
     try:
-        name = json.loads((data_dir() / "config.json").read_text()).get("owner")
+        name = json.loads((data_dir() / "config.json").read_text(encoding="utf-8")).get("owner")
         if name:
             return name
     except (OSError, ValueError):

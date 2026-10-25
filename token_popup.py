@@ -149,7 +149,7 @@ def live_sessions(records):
     if folder.is_dir():
         for f in folder.glob("*.json"):
             try:
-                d = json.loads(f.read_text())
+                d = json.loads(f.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 continue
             if not d.get("sessionId") or not pid_alive(d.get("pid")):
