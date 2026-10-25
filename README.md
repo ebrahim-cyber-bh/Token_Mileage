@@ -4,21 +4,12 @@ A live token counter for Claude Code, styled like a classic car odometer in Clau
 
 By Ebrahim Alnasser.
 
-```
-┌──────────────────────────────────────────┐      ┌──────────────────────────────────────────┐
-│ ✻ Claude Code  odometer               ⇄  │      │ ✻ Usage  Max plan                     ⇄  │
-│   ┌─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┐                │      │ PLAN USAGE                               │
-│   │0│1│8│7│4│5│8│9│2│9│2│                │ flip │ Current session    42% used · resets 1AM │
-│   └─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┘                │ ───► │ ████████░░░░░░░░░░░                      │
-│        tokens · all time                 │      │ This week · all    67% used · resets Mon │
-│ SESSIONS  ● ●                            │      │ █████████████░░░░░░                      │
-│ 1 working · 1 finished                   │      │ TOKENS   This session 58M   Today 62M    │
-└──────────────────────────────────────────┘      │          Last 7 days 915M   Month 1.39B  │
-                                                  └──────────────────────────────────────────┘
-```
+| Front: the odometer | Back: plan usage (flip with ⇄) |
+|---|---|
+| ![Front of the odometer](screenshots/front.png) | ![Back of the odometer](screenshots/back.png) |
 
-- **Front:** rolling digit drums showing every token Claude Code has used on this device, in full. There is one dot per open Claude Code terminal: **orange pulsing** = working, **green glow** = finished. Hover a dot to see the session name, or click it to see that session's numbers.
-- **Back** (flip with ⇄): **plan usage**, the same bars `/usage` shows for the account signed in to Claude Code (current session and this week for all models), with % used and reset time. Bars turn red at 90%. Below the bars: tokens for this session, today, the last 7 days, this month, and a 7-day forecast.
+- **Front:** rolling digit drums showing every token Claude Code has used on this device, in full. There is one dot per open Claude Code terminal: **orange pulsing** = working, **green glow** = finished. Hover a dot to see the session name. Bottom right: RAM and disk used of total, in red above 90%.
+- **Back** (flip with ⇄): **plan usage**, the same bars `/usage` shows for the account signed in to Claude Code (current session and this week for all models), with % used and reset time. Bars turn red at 90%.
 - **Command line:** a full report by day, project, model and session, with API-price estimates and an optional HTML report.
 
 Only the Python standard library is needed (Python 3.9+ with Tk). Works on Linux, macOS and Windows.
@@ -69,9 +60,10 @@ Costs are estimates at Anthropic API list prices. On a Pro/Max subscription this
 
 | File | What it does |
 |---|---|
-| `token_popup.py` | The desktop odometer (Tkinter): front odometer, session dots, flip animation, back card |
+| `token_popup.py` | The desktop odometer (Tkinter): front odometer, session dots, RAM/disk, flip animation, plan-usage card |
 | `token_calc.py` | Reads Claude Code logs, removes duplicates, keeps the ledger, prices, CLI and HTML report |
 | `plan_usage.py` | Plan limits (`/usage` bars) for the signed-in account |
 | `install.py` | Desktop shortcut / app-menu entry, optional owner name |
 | `icon.svg` | App icon |
+| `screenshots/` | Front and back of the widget |
 | `CLAUDE.md` | Notes for Claude Code: how it works and how to extend it safely |
