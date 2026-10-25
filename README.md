@@ -9,7 +9,7 @@ By Alna (Ebrahim Alnasser).
 | ![Front of the odometer](screenshots/front.png) | ![Back of the odometer](screenshots/back.png) |
 
 - **Front:** rolling digit drums showing every token Claude Code has used on this device, in full. There is one dot per open Claude Code terminal: **orange pulsing** = working, **green glow** = finished. Hover a dot to see the session name. Bottom right: RAM and disk used of total, in red above 90%.
-- **Back** (flip with ⇄): **plan usage**, the same bars `/usage` shows for the account signed in to Claude Code (current session and this week for all models), with % used and reset time. Bars turn red at 90%.
+- **Back** (flip with ⇄): **plan usage**, the same bars `/usage` shows for the account signed in to Claude Code (current session and this week for all models), with % used and reset time, and the email of the signed-in account. Bars turn red at 90%.
 - **Light:** it sleeps when nothing changes and uses about 1-2% of one CPU core while running.
 - **Command line:** a full report by day, project, model and session, with API-price estimates and an optional HTML report.
 

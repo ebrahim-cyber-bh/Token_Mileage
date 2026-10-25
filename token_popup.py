@@ -359,7 +359,11 @@ class App:
         body.pack(fill="both", expand=True, pady=(0, 10))
 
         # Plan limits, like /usage: label, "% used · resets …", and a bar.
-        self.lbl(body, "PLAN USAGE", 8, "mute", font=MONO, anchor="w").pack(fill="x")
+        top = tk.Frame(body, bg=C["panel"])
+        top.pack(fill="x")
+        self.lbl(top, "PLAN USAGE", 8, "mute", font=MONO).pack(side="left")
+        self.email = self.lbl(top, "", 8, "mute", font=MONO)      # signed-in account
+        self.email.pack(side="right")
         self.plan_msg = self.lbl(body, "Loading…", 9, "mute", font=MONO, anchor="w")
         self.plan_msg.pack(fill="x")
         self.slot_area = tk.Frame(body, bg=C["panel"])
@@ -414,6 +418,7 @@ class App:
     def plan_loop(self):
         while True:
             res = plan_usage.fetch()
+            res["email"] = plan_usage.account_email()
             self.plan = res
             self.root.after(0, self.render_plan)
             # Back off when Anthropic says busy; otherwise refresh every couple of minutes.
@@ -423,6 +428,8 @@ class App:
         res = self.plan
         if res is None:
             return
+        email = res.get("email") or ""
+        self.email.configure(text=email if len(email) <= 34 else email[:33] + "…")
         if not res["ok"]:
             self.plan_msg.configure(text=res["error"])
             self.plan_msg.pack(fill="x", before=self.slot_area)

@@ -49,7 +49,7 @@ Claude Code sign-in ──► plan_usage.fetch() ──► api.anthropic.com/api
   - `SCALE` / `px()` scale fixed pixel sizes to the screen DPI (fonts scale by themselves), so 125-200% Windows displays don't clip.
   - `memory()` / `storage()` give RAM and disk (home drive) per OS. `size_line()` shows *used of total*, red above 90%.
   - `credit()` draws the author signature (see "Credit").
-- **plan_usage.py**: reads Claude Code's OAuth sign-in (`~/.claude/.credentials.json`, or the macOS Keychain item `Claude Code-credentials`) and calls the usage endpoint with `anthropic-beta: oauth-2025-04-20`. Returns `{"ok", "plan", "limits":[{key,label,pct,resets}]}` or `{"ok": False, "error"}`.
+- **plan_usage.py**: reads Claude Code's OAuth sign-in (`~/.claude/.credentials.json`, or the macOS Keychain item `Claude Code-credentials`) and calls the usage endpoint with `anthropic-beta: oauth-2025-04-20`. Returns `{"ok", "plan", "limits":[{key,label,pct,resets}]}` or `{"ok": False, "error"}`. `account_email()` reads the signed-in email from `~/.claude.json` (`oauthAccount.emailAddress`); the back card shows it next to "PLAN USAGE".
 - **doctor.py**: requirement checks for setup (`--json` for Claude). Never prints the token.
 - **install.py**: shortcuts per OS (Linux `.desktop` + app menu, macOS `.command` + LaunchAgent, Windows `.lnk` on the desktop + Start Menu + Startup folder), `--owner`, `--autostart`, `--no-desktop`, `--status`, `--uninstall`, `--launch`.
 

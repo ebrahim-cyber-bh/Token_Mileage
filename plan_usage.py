@@ -60,6 +60,18 @@ def _read_oauth():
         return None
 
 
+def account_email():
+    """Email of the account signed in to Claude Code (from its settings file), or None."""
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    path = Path(env).expanduser() / ".claude.json" if env else Path.home() / ".claude.json"
+    try:
+        acct = json.loads(path.read_text(encoding="utf-8")).get("oauthAccount") or {}
+        email = acct.get("emailAddress")
+        return email if isinstance(email, str) and "@" in email else None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def _when(iso):
     if not iso:
         return None
@@ -137,7 +149,7 @@ if __name__ == "__main__":
         print(res["error"])
         sys.exit(1)
     if res["plan"]:
-        print(f"Plan: {res['plan']}")
+        print(f"Plan: {res['plan']}" + (f"  ({account_email()})" if account_email() else ""))
     for lim in res["limits"]:
         bar = "█" * round(lim["pct"] / 5) + "░" * (20 - round(lim["pct"] / 5))
         print(f"{lim['label']:<26} {bar} {lim['pct']:5.1f}% used  {reset_text(lim['resets'])}")
