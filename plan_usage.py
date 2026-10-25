@@ -60,16 +60,36 @@ def _read_oauth():
         return None
 
 
-def account_email():
-    """Email of the account signed in to Claude Code (from its settings file), or None."""
+def settings_path():
     env = os.environ.get("CLAUDE_CONFIG_DIR")
-    path = Path(env).expanduser() / ".claude.json" if env else Path.home() / ".claude.json"
+    return Path(env).expanduser() / ".claude.json" if env else Path.home() / ".claude.json"
+
+
+def sign_in_stamp():
+    """Last-change times of Claude Code's settings and sign-in files. Only file dates are read
+    (no contents), so checking this every few seconds is nearly free. It changes on /login and /logout."""
+    out = []
+    for p in (settings_path(), _config_dir() / ".credentials.json"):
+        try:
+            st = p.stat()
+            out.append((st.st_mtime_ns, st.st_size))
+        except OSError:
+            out.append(None)
+    return tuple(out)
+
+
+def account():
+    """(account id, email) of the account signed in to Claude Code, from its settings file."""
     try:
-        acct = json.loads(path.read_text(encoding="utf-8")).get("oauthAccount") or {}
+        acct = json.loads(settings_path().read_text(encoding="utf-8")).get("oauthAccount") or {}
         email = acct.get("emailAddress")
-        return email if isinstance(email, str) and "@" in email else None
+        return acct.get("accountUuid"), (email if isinstance(email, str) and "@" in email else None)
     except (OSError, ValueError, AttributeError):
-        return None
+        return None, None
+
+
+def account_email():
+    return account()[1]
 
 
 def _when(iso):

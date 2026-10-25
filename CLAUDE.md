@@ -57,7 +57,8 @@ Claude Code sign-in ──► plan_usage.fetch() ──► api.anthropic.com/api
 
 - **Never print, log, save or send the OAuth token** anywhere except `api.anthropic.com`. Never refresh it here: refreshing rotates tokens and can sign Claude Code out. If it has expired, tell the user to open Claude Code.
 - The usage endpoint is **not a public API**. Keep every field access defensive. Unknown or missing data must show "Usage not available", never crash the widget.
-- Poll the usage endpoint at most every 120 s, and back off on HTTP 429.
+- Poll the usage endpoint every 120 s, and back off on HTTP 429. The one exception is an account switch: `data_loop` checks only the file dates of `~/.claude.json` and `.credentials.json` (`plan_usage.sign_in_stamp()`); when the account id or sign-in changes it shows the new email at once and wakes `plan_loop`, which still never calls more often than every `PLAN_MIN_GAP_S` (10 s).
+- Everything else is local: tokens come from log files on disk, and nothing calls a Claude model, so the odometer never uses Claude credits or tokens.
 - **Keep it light.** The UI thread only draws. File scans, network and sums run in threads. No animation loop runs while nothing moves. Target: about 1-2% of one CPU core. Measure before and after any UI change.
 - Token totals must stay deduplicated, and the ledger must only grow (it is the history after Claude Code deletes old logs).
 - `report.html` and `ledger.jsonl` contain the user's personal usage data. Never commit them.

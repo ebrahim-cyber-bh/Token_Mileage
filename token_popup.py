@@ -28,6 +28,7 @@ import plan_usage  # noqa: E402
 
 REFRESH_S = 2               # how often logs and live sessions are re-read (in a background thread)
 PLAN_REFRESH_S = 120         # plan limits change slowly; don't poll Anthropic more than this
+PLAN_MIN_GAP_S = 10          # after an account switch, refresh at once but never more than every 10 s
 PLAN_KEYS = ("five_hour", "seven_day")   # bars on the back: current session + this week (all models)
 PLAN_SLOTS = len(PLAN_KEYS)
 FRAME_MS = 50               # 20 fps while digits roll; the widget sleeps when nothing moves
@@ -271,6 +272,7 @@ class App:
         self.front_up = True
         self.flipping = False
         self.plan = None              # last plan_usage.fetch() result
+        self.plan_now = threading.Event()   # set when the signed-in account may have changed
         self.stats = []
         self.animating = False
         self.dots_key = None          # what the dots canvas last drew, to skip identical redraws
@@ -391,8 +393,23 @@ class App:
         led.scan()
         self.ledger = led
         changed = True
+        stamp, who = plan_usage.sign_in_stamp(), plan_usage.account()
         while True:
             try:
+                # Account switched (/login, /logout)? Only file dates are checked every 2 s; the
+                # settings file is read only when its date changes. Show the new email at once and
+                # refresh the bars right away instead of waiting up to 2 minutes.
+                s = plan_usage.sign_in_stamp()
+                if s != stamp:
+                    signin_changed = s[1] != stamp[1]
+                    stamp = s
+                    now_who = plan_usage.account()
+                    if now_who != who:
+                        who = now_who
+                        self.root.after(0, self.account_switched, who[1])
+                        self.plan_now.set()
+                    elif signin_changed:
+                        self.plan_now.set()
                 now = datetime.now().astimezone()
                 if changed or now.date() != last_day:
                     recs = led.snapshot()
@@ -415,14 +432,27 @@ class App:
             self.set_hover(None)
         self.wake()
 
+    def account_switched(self, email):
+        """New account: show its email at once and hide the old account's bars until fresh ones arrive."""
+        self.plan = {"ok": False, "error": "Loading…", "email": email}
+        self.render_plan()
+
     def plan_loop(self):
         while True:
+            self.plan_now.clear()
+            last = time.monotonic()
             res = plan_usage.fetch()
             res["email"] = plan_usage.account_email()
             self.plan = res
-            self.root.after(0, self.render_plan)
-            # Back off when Anthropic says busy; otherwise refresh every couple of minutes.
-            time.sleep(PLAN_REFRESH_S * (3 if not res["ok"] and "Busy" in res["error"] else 1))
+            try:
+                self.root.after(0, self.render_plan)
+            except RuntimeError:          # window closed
+                return
+            # Refresh every couple of minutes (longer when Anthropic says busy), or sooner when the
+            # account changes, but never more often than PLAN_MIN_GAP_S.
+            busy = not res["ok"] and "Busy" in res["error"]
+            self.plan_now.wait(PLAN_REFRESH_S * (3 if busy else 1))
+            time.sleep(max(0.0, PLAN_MIN_GAP_S * (6 if busy else 1) - (time.monotonic() - last)))
 
     def render_plan(self):
         res = self.plan
