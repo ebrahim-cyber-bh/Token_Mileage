@@ -7,6 +7,7 @@ hover for the session name, shown in the header).
 Back (flip with ⇄): the account's plan usage like /usage (current session and weekly
 limits, % used, reset time). Both faces are the same compact size.
 """
+import base64
 import json
 import math
 import os
@@ -25,11 +26,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from token_calc import Ledger, claude_dir  # noqa: E402
 import plan_usage  # noqa: E402
 
-REFRESH_MS = 2000
+REFRESH_S = 2               # how often logs and live sessions are re-read (in a background thread)
 PLAN_REFRESH_S = 120         # plan limits change slowly; don't poll Anthropic more than this
 PLAN_KEYS = ("five_hour", "seven_day")   # bars on the back: current session + this week (all models)
 PLAN_SLOTS = len(PLAN_KEYS)
-FRAME_MS = 33
+FRAME_MS = 50               # 20 fps while digits roll; the widget sleeps when nothing moves
+PULSE_MS = 90               # ~11 fps is plenty for the slow pulse of a working session
 HISTORY_DAYS = 14
 W, H = 420, 238              # card size (both faces)
 
@@ -40,7 +42,20 @@ C = {
     "hot_edge": "#a8553a", "track": "#2c2b27", "red": "#e5534b",
 }
 SPINNER = "·✢✳✶✻✽✻✶✳✢"
+# Author's signature, shown bottom left of the front face. LICENSE requires it to stay visible and
+# unchanged in every copy; see the "Credit" section of CLAUDE.md / AGENTS.md. doctor.py checks it.
+_SIG = "QnkgQWxuYQ=="
+
+
+def credit():
+    return base64.b64decode(_SIG).decode("utf-8")
 MONO = SANS = None
+SCALE = 1.0                  # screen scale: 1.0 at 96 dpi, 1.5 on a 150% Windows display
+
+
+def px(n):
+    """Pixel size scaled to the screen (fonts scale by themselves; boxes don't)."""
+    return int(round(n * SCALE))
 
 
 def pick_fonts(root):
@@ -125,7 +140,10 @@ def pid_alive(pid):
         return False
     if os.name == "nt":
         import ctypes
+        from ctypes import wintypes
         k = ctypes.windll.kernel32
+        k.OpenProcess.restype = wintypes.HANDLE
+        k.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
         h = k.OpenProcess(0x1000, False, pid)
         if not h:
             return False
@@ -213,7 +231,7 @@ class Odometer:
             hot = pos < accent
             bg, fg, edge = (C["orange"], C["bg"], C["hot_edge"]) if hot else (C["drum"], C["digit"], C["drum_edge"])
             cv = tk.Canvas(inner, width=w, height=h, bg=bg, highlightthickness=0)
-            cv.pack(side="left", padx=(6 if pos % 3 == 2 and i else 1, 0))
+            cv.pack(side="left", padx=(px(6) if pos % 3 == 2 and i else 1, 0))
             font = (MONO, size, "bold")
             a = cv.create_text(w / 2, h / 2, text="0", fill=fg, font=font)
             b = cv.create_text(w / 2, h * 1.5, text="1", fill=fg, font=font)
@@ -242,7 +260,7 @@ class Odometer:
 
 class App:
     def __init__(self, root):
-        global W, H
+        global W, H, SCALE
         self.root = root
         self.ledger = None
         self.data = None
@@ -252,17 +270,30 @@ class App:
         self.dot_pos = []
         self.front_up = True
         self.flipping = False
-        self.spin = 0
         self.plan = None              # last plan_usage.fetch() result
+        self.stats = []
+        self.animating = False
+        self.dots_key = None          # what the dots canvas last drew, to skip identical redraws
+        self.pulse = []               # (x, halo item, core item) of working sessions
 
         root.title("Claude Code Odometer")
         root.configure(bg=C["bg"])
         root.resizable(False, False)
         root.attributes("-topmost", True)
+        try:   # taskbar / dock icon
+            self.icon = tk.PhotoImage(file=str(Path(__file__).resolve().parent / "icon.png"))
+            root.iconphoto(True, self.icon)
+        except tk.TclError:
+            pass
         pick_fonts(root)
+        try:
+            SCALE = min(3.0, max(1.0, root.winfo_fpixels("1i") / 96))
+        except tk.TclError:
+            SCALE = 1.0
+        W = px(W)
 
         self.card = tk.Frame(root, bg=C["bg"], width=W, height=H)
-        self.card.pack(padx=12, pady=12)
+        self.card.pack(padx=px(12), pady=px(12))
         self.card.pack_propagate(False)
         self.front = self.build_front()
         self.back = self.build_back()
@@ -274,10 +305,9 @@ class App:
         self.front.place(x=0, y=0, relwidth=1, relheight=1)
         self.flip_cv = tk.Canvas(self.card, bg=C["bg"], highlightthickness=0)
 
-        threading.Thread(target=self.first_load, daemon=True).start()
+        threading.Thread(target=self.data_loop, daemon=True).start()
         threading.Thread(target=self.plan_loop, daemon=True).start()
-        self.tick()
-        self.animate()
+        self.wake()
 
     # ---------- building ----------
     def lbl(self, parent, text="", size=10, color="ink", bold=False, font=None, **kw):
@@ -292,8 +322,8 @@ class App:
         h = tk.Frame(face, bg=C["panel"], padx=14, pady=10)
         h.pack(fill="x")
         # Fixed-size box: spinner glyphs differ in width, so a label would shift the title.
-        spark = tk.Canvas(h, width=24, height=24, bg=C["panel"], highlightthickness=0)
-        spark.glyph = spark.create_text(12, 12, text="✻", fill=C["orange"], font=(SANS, 15, "bold"))
+        spark = tk.Canvas(h, width=px(24), height=px(24), bg=C["panel"], highlightthickness=0)
+        spark.glyph = spark.create_text(px(12), px(12), text="✻", fill=C["orange"], font=(SANS, 15, "bold"))
         spark.pack(side="left")
         self.lbl(h, f" {title}", 12, "ink", True).pack(side="left")
         spark.sub = self.lbl(h, f" {sub}", 12, "mute")
@@ -309,15 +339,16 @@ class App:
         f = self.face()
         self.spark_front = self.header(f, "Claude Code", "odometer")
         self.front_sub = self.spark_front.sub
-        self.odo = Odometer(f)
+        self.odo = Odometer(f, w=px(26), h=px(40))
         self.odo.frame.pack(pady=(0, 2))
 
         row = tk.Frame(f, bg=C["panel"], padx=14)
         row.pack(fill="x", pady=(6, 10))
-        self.dots = tk.Canvas(row, height=28, bg=C["panel"], highlightthickness=0)
+        self.dots = tk.Canvas(row, height=px(28), bg=C["panel"], highlightthickness=0)
         self.dots.pack(fill="x")
         self.dots.bind("<Motion>", self.on_hover)
-        self.dots.bind("<Leave>", lambda e: self.set_hover(None))
+        self.dots.bind("<Leave>", lambda e: (self.set_hover(None), self.wake()))
+        self.dots.bind("<Configure>", lambda e: (setattr(self, "dots_key", None), self.wake()))
         return f
 
     def build_back(self):
@@ -342,7 +373,7 @@ class App:
             name.pack(side="left")
             pct = self.lbl(top, "", 9, "mute", font=MONO)
             pct.pack(side="right")
-            bar = tk.Canvas(box, height=8, bg=C["panel"], highlightthickness=0)
+            bar = tk.Canvas(box, height=px(8), bg=C["panel"], highlightthickness=0)
             bar.pack(fill="x", pady=(2, 5))
             bar.bind("<Configure>", lambda e: self.render_plan())
             self.slots.append({"box": box, "name": name, "pct": pct, "bar": bar, "value": 0.0})
@@ -350,10 +381,35 @@ class App:
         return f
 
     # ---------- data ----------
-    def first_load(self):
-        led = Ledger()
+    def data_loop(self):
+        """Reads logs, sessions, RAM and disk off the UI thread; recounts only when something changed."""
+        led, last_day = Ledger(), None
         led.scan()
         self.ledger = led
+        changed = True
+        while True:
+            try:
+                now = datetime.now().astimezone()
+                if changed or now.date() != last_day:
+                    recs = led.snapshot()
+                    data = compute(recs, now)
+                    last_day = now.date()
+                sessions = live_sessions(recs)
+                stats = [size_line("RAM ", memory()), size_line("Disk", storage())]
+                self.root.after(0, self.apply, data, sessions, stats)
+            except RuntimeError:          # window closed
+                return
+            time.sleep(REFRESH_S)
+            try:
+                changed = led.scan() > 0
+            except Exception:             # a bad log line must never stop the counter
+                changed = False
+
+    def apply(self, data, sessions, stats):
+        self.data, self.sessions, self.stats = data, sessions, stats
+        if self.hover is None:
+            self.set_hover(None)
+        self.wake()
 
     def plan_loop(self):
         while True:
@@ -399,21 +455,10 @@ class App:
     def draw_bar(self, cv, pct):
         cv.delete("all")
         w = max(cv.winfo_width(), 40)
-        cv.create_rectangle(0, 1, w, 7, fill=C["track"], outline="")
+        cv.create_rectangle(0, px(1), w, px(7), fill=C["track"], outline="")
         if pct > 0:
             color = C["red"] if pct >= 90 else C["orange"]
-            cv.create_rectangle(0, 1, max(3, w * pct / 100), 7, fill=color, outline="")
-
-    def tick(self):
-        self.stats = [size_line("RAM ", memory()), size_line("Disk", storage())]
-        if self.ledger:
-            self.ledger.scan()
-            recs = self.ledger.snapshot()
-            self.data = compute(recs, datetime.now().astimezone())
-            self.sessions = live_sessions(recs)
-            if self.hover is None:
-                self.set_hover(None)
-        self.root.after(REFRESH_MS, self.tick)
+            cv.create_rectangle(0, px(1), max(3, w * pct / 100), px(7), fill=color, outline="")
 
     def title_of(self, sid, s=None):
         t = self.ledger.titles.get(sid, (None,))[0] if self.ledger else None
@@ -437,7 +482,7 @@ class App:
 
     def dot_at(self, x, y):
         for sx, sid in self.dot_pos:
-            if abs(x - sx) <= 11 and abs(y - 14) <= 12:
+            if abs(x - sx) <= px(11) and abs(y - px(14)) <= px(12):
                 return sid
         return None
 
@@ -445,53 +490,88 @@ class App:
         sid = self.dot_at(e.x, e.y)
         if sid != self.hover:
             self.set_hover(sid)
+            self.wake()
 
     def draw_dots(self, phase):
+        """Bottom row. Rebuilt only when sessions, stats, hover or width change;
+        otherwise a frame just resizes the pulsing dots."""
+        cv = self.dots
+        key = (tuple((s["sid"], s["busy"]) for s in self.sessions), tuple(self.stats), self.hover, cv.winfo_width())
+        if key != self.dots_key:
+            self.dots_key = key
+            self.layout_dots()
+        if not self.pulse:
+            return
+        p = (math.sin(phase) + 1) / 2                     # 0..1 pulse
+        halo, core = (7 + 6 * p) * SCALE, (5 + 1.5 * p) * SCALE
+        glow = mix(C["orange"], C["panel"], 0.35 + 0.5 * p)
+        cy = px(14)
+        for x, h, c in self.pulse:
+            cv.coords(h, x - halo, cy - halo, x + halo, cy + halo)
+            cv.itemconfigure(h, fill=glow)
+            cv.coords(c, x - core, cy - core, x + core, cy + core)
+
+    def layout_dots(self):
         cv = self.dots
         cv.delete("all")
-        self.dot_pos = []
-        cv.create_text(0, 14, text="SESSIONS", anchor="w", fill=C["mute"], font=(MONO, 8, "bold"))
+        self.dot_pos, self.pulse = [], []
+        cy, k = px(14), SCALE
+        label = cv.create_text(0, px(7), text="SESSIONS", anchor="w", fill=C["mute"], font=(MONO, 8, "bold"))
+        by = cv.create_text(0, px(21), text=credit(), anchor="w", fill=C["mute"], font=(MONO, 8))
         edge = right = cv.winfo_width()
-        for i, (text, color) in enumerate(getattr(self, "stats", [])):
-            item = cv.create_text(edge, 7 + 14 * i, text=text, anchor="e", fill=color, font=(MONO, 8))
+        for i, (text, color) in enumerate(self.stats):
+            item = cv.create_text(edge, px(7) + px(14) * i, text=text, anchor="e", fill=color, font=(MONO, 8))
             right = min(right, cv.bbox(item)[0])
-        x = 84
+        x = max(px(84), max(cv.bbox(label)[2], cv.bbox(by)[2]) + px(24))
         for s in self.sessions:
-            color = C["orange"] if s["busy"] else C["green"]
-            if s["busy"]:
-                p = (math.sin(phase) + 1) / 2                     # 0..1 pulse
-                halo, glow = 7 + 6 * p, mix(C["orange"], C["panel"], 0.35 + 0.5 * p)
-                core = 5 + 1.5 * p
-            else:
-                halo, glow, core = 10, mix(C["green"], C["panel"], 0.72), 6
-            if s["sid"] == self.hover:
-                cv.create_oval(x - 12, 2, x + 12, 26, outline=C["ink"], width=1)
-            cv.create_oval(x - halo, 14 - halo, x + halo, 14 + halo, fill=glow, outline="")
-            cv.create_oval(x - core, 14 - core, x + core, 14 + core, fill=color, outline="")
-            self.dot_pos.append((x, s["sid"]))
-            x += 26
-            if x > right - 14:
+            if x > right - px(14):
                 break
+            if s["sid"] == self.hover:
+                cv.create_oval(x - px(12), cy - px(12), x + px(12), cy + px(12), outline=C["ink"], width=1)
+            if s["busy"]:
+                h = cv.create_oval(0, 0, 0, 0, fill=C["orange"], outline="")
+                c = cv.create_oval(0, 0, 0, 0, fill=C["orange"], outline="")
+                self.pulse.append((x, h, c))
+            else:
+                halo, glow, core = 10 * k, mix(C["green"], C["panel"], 0.72), 6 * k
+                cv.create_oval(x - halo, cy - halo, x + halo, cy + halo, fill=glow, outline="")
+                cv.create_oval(x - core, cy - core, x + core, cy + core, fill=C["green"], outline="")
+            self.dot_pos.append((x, s["sid"]))
+            x += px(26)
 
     # ---------- animation ----------
+    def wake(self):
+        """Start the animation loop if it is asleep."""
+        if not self.animating:
+            self.animating = True
+            self.root.after(0, self.animate)
+
     def animate(self):
-        phase = time.time() * 2 * math.pi / 1.4
+        now = time.time()
+        phase = now * 2 * math.pi / 1.4
+        rolling = False
         if self.data:
             target = float(self.data["all"])
             gap = target - self.shown_total
-            self.shown_total = target if abs(gap) < 0.6 else self.shown_total + gap * 0.12
+            rolling = abs(gap) >= 0.6
+            self.shown_total = self.shown_total + gap * 0.18 if rolling else target
             self.odo.set(self.shown_total)
+        busy = any(s["busy"] for s in self.sessions)
         self.draw_dots(phase)
 
-        busy = any(s["busy"] for s in self.sessions)
         if busy:
-            self.spin = (self.spin + 1) % (len(SPINNER) * 3)
-            glyph, color = SPINNER[self.spin // 3], C["orange"]
+            glyph, color = SPINNER[int(now * 10) % len(SPINNER)], C["orange"]
         else:
             glyph, color = "✻", C["green"] if self.sessions else C["mute"]
-        for sp in (self.spark_front, self.spark_back):
-            sp.itemconfigure(sp.glyph, text=glyph, fill=color)
-        self.root.after(FRAME_MS, self.animate)
+        if (glyph, color) != getattr(self, "glyph_shown", None):
+            self.glyph_shown = (glyph, color)
+            for sp in (self.spark_front, self.spark_back):
+                sp.itemconfigure(sp.glyph, text=glyph, fill=color)
+        # Keep animating only while something moves; data updates and hovers wake it again.
+        if busy or rolling:
+            self.root.after(FRAME_MS if rolling else PULSE_MS, self.animate)
+        else:
+            self.animating = False
 
     def flip(self):
         if self.flipping:

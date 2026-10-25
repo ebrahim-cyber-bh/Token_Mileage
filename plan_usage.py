@@ -130,6 +130,8 @@ def fetch(timeout=10):
 
 
 if __name__ == "__main__":
+    from token_calc import utf8_stdout
+    utf8_stdout()
     res = fetch()
     if not res["ok"]:
         print(res["error"])

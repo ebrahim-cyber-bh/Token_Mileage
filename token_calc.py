@@ -27,9 +27,23 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 FIELDS = ("input", "output", "cache_write", "cache_read")
+READ_BLOCK = 1 << 20          # log files are read in 1 MB pieces to keep memory low
 
 
 # ---------- locations and settings ----------
+
+# On Windows, hide the console window that would flash up for each subprocess.
+NO_WINDOW = {"creationflags": 0x08000000} if os.name == "nt" else {}
+
+
+def utf8_stdout():
+    """Windows pipes default to a legacy code page that can't print "—", "█" or "✻"."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
 
 def claude_dir():
     return Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
@@ -69,7 +83,7 @@ def owner_name():
         return os.environ["CLAUDE_ODOMETER_OWNER"]
     try:
         name = subprocess.run(["git", "config", "--global", "user.name"], capture_output=True,
-                              text=True, timeout=3).stdout.strip()
+                              text=True, timeout=3, **NO_WINDOW).stdout.strip()
         if name:
             return name
     except (OSError, subprocess.SubprocessError):
@@ -237,26 +251,27 @@ class Ledger:
                     continue
                 start = self.offsets.get(path, 0)
                 if size < start:
-                    start, self.partial[path] = 0, ""
+                    start, self.partial[path] = 0, b""
                 if size == start:
                     continue
+                # Read 1 MB at a time: logs can be hundreds of MB, and most lines hold no usage.
                 try:
                     with open(path, "rb") as fh:
                         fh.seek(start)
-                        chunk = fh.read(size - start)
+                        rest = self.partial.get(path, b"")
+                        left = size - start
+                        while left > 0:
+                            block = fh.read(min(left, READ_BLOCK))
+                            if not block:
+                                break
+                            left -= len(block)
+                            lines = (rest + block).split(b"\n")
+                            rest = lines.pop()
+                            self._take(lines, path, changed)
                 except OSError:
                     continue
-                self.offsets[path] = size
-                lines = (self.partial.get(path, "") + chunk.decode("utf-8", "replace")).split("\n")
-                self.partial[path] = lines.pop()
-                with self.lock:
-                    for line in lines:
-                        t = parse_title(line)
-                        if t and t[0] and (t[2] or not self.titles.get(t[0], ("", False))[1]):
-                            self.titles[t[0]] = (t[1], t[2])
-                        hit = parse_line(line, path.parent.name, path.stem)
-                        if hit and self._merge(*hit):
-                            changed.append(hit[0])
+                self.offsets[path] = size - left
+                self.partial[path] = rest
         if changed:
             try:
                 with open(self.path, "a", encoding="utf-8") as fh:
@@ -265,6 +280,19 @@ class Ledger:
             except OSError:
                 pass
         return len(changed)
+
+    def _take(self, lines, path, changed):
+        with self.lock:
+            for raw in lines:
+                if b'"usage"' not in raw and b'-title"' not in raw:
+                    continue
+                line = raw.decode("utf-8", "replace")
+                t = parse_title(line)
+                if t and t[0] and (t[2] or not self.titles.get(t[0], ("", False))[1]):
+                    self.titles[t[0]] = (t[1], t[2])
+                hit = parse_line(line, path.parent.name, path.stem)
+                if hit and self._merge(*hit):
+                    changed.append(hit[0])
 
     def snapshot(self):
         with self.lock:
@@ -404,6 +432,7 @@ footer{{color:var(--mute);font-size:13px;margin-top:32px}}
 
 
 def main():
+    utf8_stdout()
     ap = argparse.ArgumentParser(description="Claude Code token calculator for this device.")
     ap.add_argument("--days", type=int, help="only the last N days")
     ap.add_argument("--since", help="only from this date (YYYY-MM-DD)")
