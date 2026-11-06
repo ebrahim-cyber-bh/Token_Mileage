@@ -4,3 +4,5 @@ ledger.jsonl
 __pycache__
 dist
 site/downloads
+.env*
+.vercel

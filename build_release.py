@@ -19,7 +19,7 @@ def files(folder, extra=()):
     for f in sorted(folder.rglob("*")):
         rel = f.relative_to(folder)
         if f.is_file() and not SKIP_DIRS & set(rel.parts) and f.name not in SKIP_FILES \
-                and not f.name.endswith((".pyc", ".bak")) and ".bak-" not in f.name:
+                and not f.name.endswith((".pyc", ".bak")) and ".bak-" not in f.name and not f.name.startswith(".env"):
             yield f, rel
     for f in extra:
         yield f, Path(f.name)
