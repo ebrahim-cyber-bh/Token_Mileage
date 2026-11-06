@@ -26,6 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from token_calc import Ledger, claude_dir, data_dir  # noqa: E402
 import plan_usage  # noqa: E402
+import updater  # noqa: E402
 
 REFRESH_S = 2               # how often logs and live sessions are re-read (in a background thread)
 PLAN_REFRESH_S = 120         # plan limits change slowly; don't poll Anthropic more than this
@@ -318,6 +319,7 @@ class App:
 
         threading.Thread(target=self.data_loop, daemon=True).start()
         threading.Thread(target=self.plan_loop, daemon=True).start()
+        threading.Thread(target=self.update_loop, daemon=True).start()
         self.wake()
 
     # ---------- window frame ----------
@@ -498,6 +500,35 @@ class App:
         """Opens the usage page in the default browser, off the UI thread."""
         threading.Thread(target=webbrowser.open, args=(USAGE_URL,), daemon=True).start()
 
+    def update_loop(self):
+        """Looks for a new version once a day (updater.check() caches the answer for 24 h)."""
+        here = Path(__file__).resolve().parent
+        time.sleep(30)
+        while True:
+            v = updater.check(here, data_dir())
+            if v:
+                try:
+                    self.root.after(0, self.show_update, v)
+                except RuntimeError:
+                    return
+            time.sleep(6 * 3600)
+
+    def show_update(self, version):
+        self.update_btn.configure(text=f"Update to {version} ↑")
+        self.update_btn.pack(side="bottom", anchor="w", pady=(4, 0))
+        self.fit_card()
+
+    def start_update(self):
+        """Runs install.py --update in its own process (it restarts the widget), then closes this one."""
+        here = Path(__file__).resolve().parent
+        kw = {"cwd": str(here), "stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+        if os.name == "nt":
+            kw["creationflags"] = 0x00000008 | 0x00000200
+        else:
+            kw["start_new_session"] = True
+        subprocess.Popen([sys.executable, str(here / "install.py"), "--update"], **kw)
+        self.close()
+
     def refresh_plan(self):
         """The ↻ button: asks plan_loop to check now, still within its minimum gap between checks."""
         if self.plan_now.is_set():
@@ -545,6 +576,8 @@ class App:
             bar.bind("<Configure>", lambda e: self.render_plan())
             self.slots.append({"box": box, "name": name, "pct": pct, "bar": bar, "value": 0.0})
 
+        self.update_btn = self.lbl(body, "", 9, "orange", True, cursor="hand2")   # shown only when a new version is out
+        self.update_btn.bind("<Button-1>", lambda e: self.start_update())
         return f
 
     # ---------- data ----------

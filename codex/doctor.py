@@ -9,7 +9,7 @@ def main():
     checks={'Python Tk module': importlib.util.find_spec('tkinter') is not None,
             'Codex session logs': (codex_dir()/'sessions').is_dir(),
             'By Alna credit': '_SIG = "QnkgQWxuYQ=="' in source and 'text=credit()' in source,
-            'License': (here.parent/'LICENSE').exists()}
+            'License': (here/'LICENSE').exists() or (here.parent/'LICENSE').exists()}
     for label,ok in checks.items(): print(f'[{"ok" if ok else "fail"}] {label}')
     return 0 if all(checks.values()) else 1
 

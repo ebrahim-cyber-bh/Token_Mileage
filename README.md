@@ -84,9 +84,17 @@ Costs are estimates at Anthropic API list prices. On a Pro/Max subscription this
 | `icon.svg` | App icon |
 | `screenshots/` | Front and back of the widget |
 | `codex/` | The separate Codex Odometer (own installer, doctor and tests) |
+| `updater.py` | Daily version check and self-update (same file in `codex/`) |
+| `site/`, `build_release.py`, `.github/workflows/release.yml` | Download page, release zips, release automation |
 | `CLAUDE.md`, `.claude/skills/setup/` | Notes and the `/setup` flow for Claude Code |
 | `AGENTS.md` | Rules for other AI coding tools |
 | `LICENSE` | MIT with an attribution clause |
+
+## Download page, releases and updates
+
+- `site/` is a static download page (plain HTML, no build step). Serve that folder as-is on any static host.
+- **Release a version:** set the same number in `VERSION`, `codex/VERSION` and `site/version.json`, commit, push, then tag it: `git tag v1.2.0 && git push origin v1.2.0`. GitHub Actions (`.github/workflows/release.yml`) tests, builds `token-mileage-claude.zip` and `token-mileage-codex.zip` (`build_release.py`) and publishes the release. The page's download buttons always point at the latest release.
+- **Updates:** once a day each odometer reads `site/version.json` from GitHub (it sends nothing about you). When a newer version is out, the back card shows **Update to …**; clicking it runs `install.py --update`, which updates the files (or runs `git pull` in a clone) and restarts the widget. History is kept. Turn the check off with `install.py --no-update-check`.
 
 ## Codex Odometer
 

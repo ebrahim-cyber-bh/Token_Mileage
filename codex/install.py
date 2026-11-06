@@ -8,6 +8,8 @@
     python3 install.py --status             # show what is installed
     python3 install.py --uninstall          # remove shortcuts and autostart (keeps your history)
     python3 install.py --launch             # start the odometer now, detached from this terminal
+    python3 install.py --update             # get the latest version (keeps your history), then restart it
+    python3 install.py --no-update-check    # never check for new versions
 
 On Windows use `py` or `python` instead of `python3`.
 """
@@ -16,6 +18,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -24,6 +27,7 @@ NAME = "Codex Odometer"
 SLUG = "codex-odometer"
 sys.path.insert(0, str(HERE))
 from token_calc import NO_WINDOW, data_dir, utf8_stdout  # noqa: E402
+import updater  # noqa: E402
 
 
 def run(cmd, **kw):
@@ -148,13 +152,35 @@ def launch():
     print(f"Started {NAME} (pid {p.pid})")
 
 
+def save_config(**changes):
+    path = data_dir() / "config.json"
+    try:
+        cfg = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        cfg = {}
+    cfg.update(changes)
+    path.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+
+
+def update():
+    """Update the program files, then start the widget again (the widget closes itself first)."""
+    log = data_dir() / "update.log"
+    with log.open("a", encoding="utf-8") as f:
+        def say(msg):
+            print(msg)
+            f.write(time.strftime("%Y-%m-%d %H:%M ") + msg + "\n")
+        updater.apply(HERE, SLUG.split("-")[0], log=say)
+        (data_dir() / "update.json").unlink(missing_ok=True)     # re-check against the new version
+
+
 def status():
     owner = None
     try:
         owner = json.loads((data_dir() / "config.json").read_text(encoding="utf-8")).get("owner")
     except (OSError, ValueError):
         pass
-    return {"owner": owner, "data_dir": str(data_dir()),
+    return {"owner": owner, "version": updater.local_version(HERE), "update_check": updater.enabled(data_dir()),
+            "data_dir": str(data_dir()),
             "installed": {k: p.exists() for k, p in targets().items()},
             "paths": {k: str(p) for k, p in targets().items()}}
 
@@ -168,8 +194,19 @@ def main():
     ap.add_argument("--status", action="store_true", help="print what is installed (JSON) and exit")
     ap.add_argument("--uninstall", action="store_true", help="remove shortcuts and autostart")
     ap.add_argument("--launch", action="store_true", help="start the odometer now")
+    ap.add_argument("--update", action="store_true", help="install the latest version, then start it")
+    ap.add_argument("--no-update-check", action="store_true", help="never check for new versions")
+    ap.add_argument("--update-check", action="store_true", help="check for new versions once a day (default)")
     args = ap.parse_args()
 
+    if args.no_update_check or args.update_check:
+        save_config(update_check=bool(args.update_check))
+        print("Update check " + ("on" if args.update_check else "off"))
+        return
+    if args.update:
+        update()
+        launch()
+        return
     if args.launch and not (args.owner or args.autostart or args.no_desktop):   # --launch alone
         launch()
         return
@@ -185,8 +222,7 @@ def main():
         return
 
     if args.owner:
-        (data_dir() / "config.json").write_text(json.dumps({"owner": args.owner}, ensure_ascii=False),
-                                                encoding="utf-8")
+        save_config(owner=args.owner)
         print(f"Owner set to {args.owner}")
     t = targets()
     kinds = ["menu"] if "menu" in t else []
