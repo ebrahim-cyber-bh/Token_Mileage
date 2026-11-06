@@ -79,25 +79,53 @@
 
   <section>
     <h2>Let your AI install it</h2>
-    <p>Copy a prompt and paste it into Claude Code, Codex or another coding assistant running on the computer. It downloads, checks and installs everything for you.</p>
+    <ol>
+      <li>Download the zip above.</li>
+      <li>Open Claude Code, Codex or another coding assistant on the same computer.</li>
+      <li>Copy the matching prompt and paste it in. It finds the download, installs Python if needed (no admin rights or password), installs the odometer and opens it. You don't need to do anything else.</li>
+    </ol>
     <h3>Claude Code Odometer</h3>
-    <div class="prompt"><pre id="p-claude">Install the Claude Code Odometer (Token Mileage) on this computer for me.
+    <div class="prompt"><pre id="p-claude">Install the Claude Code Odometer (Token Mileage) from the token-mileage-claude.zip I just downloaded. Do every step yourself, including installing anything that is missing. Do not ask me questions, and do not ask me to run commands, install software or type a password.
 
-1. Download https://token-mileage.ebrahim-alnasser.com/downloads/token-mileage-claude.zip and unzip it into my home folder, so the files are in ~/token-mileage-claude (Windows: %USERPROFILE%\token-mileage-claude).
-2. Find Python 3.9 or newer. On Windows use "py" (never "python3"). If Python or Tk is missing, tell me the exact command to install it and wait for me.
-3. In that folder run "doctor.py" and fix anything marked fail. Give me any sudo command to run myself.
-4. Run "install.py --launch" to add the desktop and menu shortcuts and open it. Ask me first if I want "--autostart" (start at login).
-5. Run "install.py --status" and tell me where the shortcut is.
+1. Find token-mileage-claude.zip or the unzipped token-mileage-claude folder. Look in the current folder, Downloads, Desktop and my home folder. Unzip it if needed, then move the token-mileage-claude folder to my home folder (~/token-mileage-claude; on Windows %USERPROFILE%\token-mileage-claude), replacing any older copy there.
+
+2. Get a Python 3.9 or newer that includes Tk. Test each candidate with:  &lt;python&gt; -c "import tkinter, sys; print(sys.version)"
+   Try python3 on Linux and macOS; on Windows try "py -3" and "python" (never "python3"). If none works, install one without admin rights or sudo using uv:
+   - Linux / macOS:  curl -LsSf https://astral.sh/uv/install.sh | sh
+   - Windows (PowerShell):  powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   Then run "uv python install 3.12" and use the interpreter path printed by "uv python find 3.12" (uv's Python includes Tk). If uv is not on the PATH yet, call it by its full path: ~/.local/bin/uv (Windows: %USERPROFILE%\.local\bin\uv.exe).
+   Call the working interpreter PY in the steps below.
+
+3. In the token-mileage-claude folder run:  PY doctor.py
+   If any check says fail, fix it yourself and run it again until everything is ok.
+
+4. Run:  PY install.py --launch
+   This adds the desktop shortcut and the app menu / Start Menu entry, and opens the odometer.
+
+5. Run:  PY install.py --status
+   Then tell me in two short lines where the shortcut is and that it is running, and that "PY install.py --autostart" makes it start at login.
 
 Do not change the "By Alna" credit or the LICENSE.</pre><button class="copy" data-for="p-claude">Copy</button></div>
     <h3>Codex Odometer</h3>
-    <div class="prompt"><pre id="p-codex">Install the Codex Odometer (Token Mileage) on this computer for me.
+    <div class="prompt"><pre id="p-codex">Install the Codex Odometer (Token Mileage) from the token-mileage-codex.zip I just downloaded. Do every step yourself, including installing anything that is missing. Do not ask me questions, and do not ask me to run commands, install software or type a password.
 
-1. Download https://token-mileage.ebrahim-alnasser.com/downloads/token-mileage-codex.zip and unzip it into my home folder, so the files are in ~/token-mileage-codex (Windows: %USERPROFILE%\token-mileage-codex).
-2. Find Python 3.9 or newer. On Windows use "py" (never "python3"). If Python or Tk is missing, tell me the exact command to install it and wait for me.
-3. In that folder run "doctor.py" and fix anything marked fail. Give me any sudo command to run myself.
-4. Run "install.py --launch" to add the desktop and menu shortcuts and open it. Ask me first if I want "--autostart" (start at login).
-5. Run "install.py --status" and tell me where the shortcut is.
+1. Find token-mileage-codex.zip or the unzipped token-mileage-codex folder. Look in the current folder, Downloads, Desktop and my home folder. Unzip it if needed, then move the token-mileage-codex folder to my home folder (~/token-mileage-codex; on Windows %USERPROFILE%\token-mileage-codex), replacing any older copy there.
+
+2. Get a Python 3.9 or newer that includes Tk. Test each candidate with:  &lt;python&gt; -c "import tkinter, sys; print(sys.version)"
+   Try python3 on Linux and macOS; on Windows try "py -3" and "python" (never "python3"). If none works, install one without admin rights or sudo using uv:
+   - Linux / macOS:  curl -LsSf https://astral.sh/uv/install.sh | sh
+   - Windows (PowerShell):  powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   Then run "uv python install 3.12" and use the interpreter path printed by "uv python find 3.12" (uv's Python includes Tk). If uv is not on the PATH yet, call it by its full path: ~/.local/bin/uv (Windows: %USERPROFILE%\.local\bin\uv.exe).
+   Call the working interpreter PY in the steps below.
+
+3. In the token-mileage-codex folder run:  PY doctor.py
+   If any check says fail, fix it yourself and run it again until everything is ok.
+
+4. Run:  PY install.py --launch
+   This adds the desktop shortcut and the app menu / Start Menu entry, and opens the odometer.
+
+5. Run:  PY install.py --status
+   Then tell me in two short lines where the shortcut is and that it is running, and that "PY install.py --autostart" makes it start at login.
 
 Do not change the "By Alna" credit or the LICENSE.</pre><button class="copy" data-for="p-codex">Copy</button></div>
   </section>
