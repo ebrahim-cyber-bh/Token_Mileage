@@ -4,8 +4,7 @@
   usage data, no account details and no token counts: it is a plain download.
   Turn it off with `install.py --no-update-check` or the environment variable TOKEN_MILEAGE_NO_UPDATE_CHECK=1.
 - apply() updates the program files. A git clone is updated with `git pull --ff-only`. A downloaded
-  copy fetches that version's zip from the project's GitHub release and copies its files over this
-  folder. Usage history lives in the data folder, not here, so it is never touched.
+  copy fetches the current zip from the download site and copies its files over this folder. Usage history lives in the data folder, not here, so it is never touched.
 
 The same file sits in the Claude meter (repo root) and the Codex meter (codex/); keep both identical.
 """
@@ -19,9 +18,9 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-REPO = "ebrahim-cyber-bh/Token_Mileage"
-VERSION_URL = f"https://raw.githubusercontent.com/{REPO}/main/site/version.json"
-ASSET_URL = "https://github.com/{repo}/releases/download/v{version}/token-mileage-{kind}.zip"
+SITE = "https://token-mileage.ebrahim-alnasser.com"       # site/ in this repo, hosted on Vercel
+VERSION_URL = f"{SITE}/version.json"
+ASSET_URL = SITE + "/downloads/token-mileage-{kind}.zip"  # built by build_release.py on every deploy
 CHECK_EVERY_S = 24 * 3600
 UA = {"User-Agent": "token-mileage-updater"}
 NO_WINDOW = {"creationflags": 0x08000000} if os.name == "nt" else {}
@@ -125,7 +124,7 @@ def apply(here, kind, log=print):
     if parse(v) <= parse(mine):
         log(f"Already up to date ({mine}).")
         return False
-    url = ASSET_URL.format(repo=REPO, version=v, kind=kind)
+    url = ASSET_URL.format(kind=kind)
     top = f"token-mileage-{kind}"
     log(f"Downloading {v} from {url}")
     with tempfile.TemporaryDirectory() as tmp:
@@ -134,13 +133,13 @@ def apply(here, kind, log=print):
             with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60) as r, zpath.open("wb") as f:
                 shutil.copyfileobj(r, f)
         except OSError as e:
-            log(f"Download failed ({e}). The release may still be building; try again in a few minutes.")
+            log(f"Download failed ({e}). Try again in a few minutes.")
             return False
         with zipfile.ZipFile(zpath) as z:
             names = _safe_members(z, top)
             z.extractall(Path(tmp) / "x", names)
         src = Path(tmp) / "x" / top
-        if not (src / "token_popup.py").exists() or local_version(src) != v:
+        if not (src / "token_popup.py").exists() or parse(local_version(src)) <= parse(mine):
             log("The download does not look like a Token Mileage release. Nothing was changed.")
             return False
         for f in src.rglob("*"):
@@ -148,5 +147,5 @@ def apply(here, kind, log=print):
                 dest = here / f.relative_to(src)
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, dest)
-    log(f"Updated {mine} -> {v}.")
+    log(f"Updated {mine} -> {local_version(here)}.")
     return True

@@ -33,6 +33,13 @@
   .claude .btn { background: var(--claude); }
   .codex .btn { background: var(--codex); }
   .small { font-size: .85rem; color: var(--mute); }
+  .prompt { position: relative; margin: 8px 0 20px; }
+  .prompt pre { margin: 0; padding: 16px; padding-inline-end: 96px; background: var(--panel); border: 1px solid var(--line);
+                border-radius: var(--radius); font: .85rem/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+  .copy { position: absolute; top: 8px; inset-inline-end: 8px; min-height: 36px; padding: 0 14px; border-radius: 8px;
+          border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-size: .85rem; cursor: pointer; }
+  .copy:hover { border-color: var(--mute); }
+  .copy:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   section { margin-top: 48px; }
   .tabs { display: flex; gap: 8px; margin: 8px 0 12px; }
   .tabs button { min-height: 44px; padding: 0 16px; border-radius: var(--radius); border: 1px solid var(--line);
@@ -59,19 +66,44 @@
       <img src="img/claude-back.png" alt="Claude Code Odometer back card with plan usage bars" width="444" height="178">
       <h2>Claude Code Odometer</h2>
       <p>Tokens Claude Code used on this computer, live session dots, and your plan's session and weekly usage, like <code>/usage</code>.</p>
-      <a class="btn" href="https://github.com/ebrahim-cyber-bh/Token_Mileage/releases/latest/download/token-mileage-claude.zip">Download for Claude Code</a>
+      <a class="btn" href="downloads/token-mileage-claude.zip" download>Download for Claude Code</a>
     </div>
     <div class="app codex">
       <img src="img/codex-front.png" alt="Codex Odometer showing the token count" width="420" height="173">
       <img src="img/codex-back.png" alt="Codex Odometer back card with recorded plan limits" width="420" height="173">
       <h2>Codex Odometer</h2>
       <p>Tokens Codex used on this computer, recent sessions, and the last plan limits Codex recorded. It never reads your sign-in.</p>
-      <a class="btn" href="https://github.com/ebrahim-cyber-bh/Token_Mileage/releases/latest/download/token-mileage-codex.zip">Download for Codex</a>
+      <a class="btn" href="downloads/token-mileage-codex.zip" download>Download for Codex</a>
     </div>
   </div>
 
   <section>
-    <h2>Install</h2>
+    <h2>Let your AI install it</h2>
+    <p>Copy a prompt and paste it into Claude Code, Codex or another coding assistant running on the computer. It downloads, checks and installs everything for you.</p>
+    <h3>Claude Code Odometer</h3>
+    <div class="prompt"><pre id="p-claude">Install the Claude Code Odometer (Token Mileage) on this computer for me.
+
+1. Download https://token-mileage.ebrahim-alnasser.com/downloads/token-mileage-claude.zip and unzip it into my home folder, so the files are in ~/token-mileage-claude (Windows: %USERPROFILE%\token-mileage-claude).
+2. Find Python 3.9 or newer. On Windows use "py" (never "python3"). If Python or Tk is missing, tell me the exact command to install it and wait for me.
+3. In that folder run "doctor.py" and fix anything marked fail. Give me any sudo command to run myself.
+4. Run "install.py --launch" to add the desktop and menu shortcuts and open it. Ask me first if I want "--autostart" (start at login).
+5. Run "install.py --status" and tell me where the shortcut is.
+
+Do not change the "By Alna" credit or the LICENSE.</pre><button class="copy" data-for="p-claude">Copy</button></div>
+    <h3>Codex Odometer</h3>
+    <div class="prompt"><pre id="p-codex">Install the Codex Odometer (Token Mileage) on this computer for me.
+
+1. Download https://token-mileage.ebrahim-alnasser.com/downloads/token-mileage-codex.zip and unzip it into my home folder, so the files are in ~/token-mileage-codex (Windows: %USERPROFILE%\token-mileage-codex).
+2. Find Python 3.9 or newer. On Windows use "py" (never "python3"). If Python or Tk is missing, tell me the exact command to install it and wait for me.
+3. In that folder run "doctor.py" and fix anything marked fail. Give me any sudo command to run myself.
+4. Run "install.py --launch" to add the desktop and menu shortcuts and open it. Ask me first if I want "--autostart" (start at login).
+5. Run "install.py --status" and tell me where the shortcut is.
+
+Do not change the "By Alna" credit or the LICENSE.</pre><button class="copy" data-for="p-codex">Copy</button></div>
+  </section>
+
+  <section>
+    <h2>Install it yourself</h2>
     <p class="small">One zip works on every system. You need Python 3.9 or newer.</p>
     <div class="tabs" role="tablist">
       <button role="tab" id="tab-win" aria-selected="true" aria-controls="win">Windows</button>
@@ -98,7 +130,7 @@
 
   <section>
     <h2>Updates</h2>
-    <p>Once a day the odometer checks the project's GitHub for a new version number. When there is one, the back of the card shows <strong>Update to …</strong>: click it and it updates itself and restarts. Your usage history is kept. You can also run <code>install.py --update</code> yourself.</p>
+    <p>Once a day the odometer checks this site for a new version number. When there is one, the back of the card shows <strong>Update to …</strong>: click it and it updates itself and restarts. Your usage history is kept. You can also run <code>install.py --update</code> yourself.</p>
     <p class="small">The check only downloads a version number; it sends none of your usage. Turn it off with <code>install.py --no-update-check</code>.</p>
   </section>
 
@@ -124,6 +156,14 @@
   }
   tabs.forEach(t => t.addEventListener('click', () => show(t)));
   if (/Linux|X11/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent)) show(tabs[1]);
+  // Copy buttons for the AI prompts.
+  document.querySelectorAll('.copy').forEach(b => b.addEventListener('click', async () => {
+    const text = document.getElementById(b.dataset.for).textContent;
+    try { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; }
+    catch { const r = document.createRange(); r.selectNodeContents(document.getElementById(b.dataset.for));
+            getSelection().removeAllRanges(); getSelection().addRange(r); b.textContent = 'Press Ctrl+C'; }
+    setTimeout(() => b.textContent = 'Copy', 2000);
+  }));
   // Current version from version.json (the same file the odometer checks).
   fetch('version.json', { cache: 'no-store' }).then(r => r.json())
     .then(d => { if (d.version) document.getElementById('version').textContent = d.version; })

@@ -4,15 +4,15 @@
     python3 build_release.py dist
 
 Each zip has one top folder (token-mileage-claude/ or token-mileage-codex/) that updater.py expects.
-Used by .github/workflows/release.yml when a version tag (v1.2.0) is pushed.
+Vercel runs it on every deploy (vercel.json) and serves the zips from site/downloads/.
 """
 import sys
 import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SKIP_DIRS = {"__pycache__", ".git", ".github", "codex", "site", "screenshots", "dist"}
-SKIP_FILES = {"build_release.py", "report.html", "ledger.jsonl"}
+SKIP_DIRS = {"__pycache__", ".git", ".github", ".vercel", "codex", "site", "screenshots", "dist", "node_modules"}
+SKIP_FILES = {"build_release.py", "report.html", "ledger.jsonl", "vercel.json", ".vercelignore"}
 
 
 def files(folder, extra=()):

@@ -1,0 +1,6 @@
+report.html
+ledger.jsonl
+*.bak-*
+__pycache__
+dist
+site/downloads

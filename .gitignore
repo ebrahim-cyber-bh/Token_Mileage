@@ -7,3 +7,5 @@ ledger.jsonl
 *.sqlite3*
 plan_last.json
 window.json
+site/downloads/
+dist/
