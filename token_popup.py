@@ -18,23 +18,28 @@ import tkinter as tk
 import tkinter.font as tkfont
 import shutil
 import subprocess
+import webbrowser
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from token_calc import Ledger, claude_dir  # noqa: E402
+from token_calc import Ledger, claude_dir, data_dir  # noqa: E402
 import plan_usage  # noqa: E402
 
 REFRESH_S = 2               # how often logs and live sessions are re-read (in a background thread)
 PLAN_REFRESH_S = 120         # plan limits change slowly; don't poll Anthropic more than this
+PLAN_MAX_BACKOFF_S = 1800    # while Anthropic answers "busy", wait longer each time, up to 30 min
 PLAN_MIN_GAP_S = 10          # after an account switch, refresh at once but never more than every 10 s
 PLAN_KEYS = ("five_hour", "seven_day")   # bars on the back: current session + this week (all models)
 PLAN_SLOTS = len(PLAN_KEYS)
+USAGE_URL = "https://claude.ai/settings/usage"   # opened by the link on the back card
 FRAME_MS = 50               # 20 fps while digits roll; the widget sleeps when nothing moves
 PULSE_MS = 90               # ~11 fps is plenty for the slow pulse of a working session
 HISTORY_DAYS = 14
 W, H = 420, 238              # card size (both faces)
+BAR_H = 26                   # own title bar (drag, minimise, close), shown only while the mouse is over the widget
+HIDE_MS = 300                # wait this long after the mouse leaves before hiding the bar
 
 C = {
     "bg": "#141413", "panel": "#1f1e1b", "line": "#3a3833", "ink": "#f0eee6",
@@ -272,6 +277,7 @@ class App:
         self.front_up = True
         self.flipping = False
         self.plan = None              # last plan_usage.fetch() result
+        self.plan_ready = 0.0         # earliest time the next usage check may run (monotonic)
         self.plan_now = threading.Event()   # set when the signed-in account may have changed
         self.stats = []
         self.animating = False
@@ -279,6 +285,7 @@ class App:
         self.pulse = []               # (x, halo item, core item) of working sessions
 
         root.title("Claude Code Odometer")
+        root.withdraw()               # stay hidden until frameless() has removed the system frame
         root.configure(bg=C["bg"])
         root.resizable(False, False)
         root.attributes("-topmost", True)
@@ -306,10 +313,144 @@ class App:
         self.card.configure(width=W, height=H)
         self.front.place(x=0, y=0, relwidth=1, relheight=1)
         self.flip_cv = tk.Canvas(self.card, bg=C["bg"], highlightthickness=0)
+        self.build_bar()
+        self.frameless()
 
         threading.Thread(target=self.data_loop, daemon=True).start()
         threading.Thread(target=self.plan_loop, daemon=True).start()
         self.wake()
+
+    # ---------- window frame ----------
+    # No system title bar: the widget draws its own slim bar (drag, minimise, close) and shows it
+    # only while the mouse is over the window. The window grows upward to fit it, so the card stays put.
+    def build_bar(self):
+        self.bar = tk.Frame(self.root, bg=C["bg"], height=px(BAR_H), padx=px(12))
+        self.bar.pack_propagate(False)
+        self.bar_on = False
+        self.hide_job = None
+        self.minimized = False
+        grip = self.lbl(self.bar, "⠿  Claude Code Odometer", 9, "mute", cursor="fleur")
+        grip.pack(side="left")
+        for text, hot, cmd in (("✕", "red", self.close), ("—", "orange", self.minimize)):
+            b = self.lbl(self.bar, text, 11, "mute", True, cursor="hand2", padx=px(6))
+            b.pack(side="right")
+            b.bind("<Button-1>", lambda e, cmd=cmd: cmd())
+            b.bind("<Enter>", lambda e, b=b, hot=hot: b.configure(fg=C[hot]))
+            b.bind("<Leave>", lambda e, b=b: b.configure(fg=C["mute"]))
+        for w in (self.bar, grip):
+            w.bind("<ButtonPress-1>", self.drag_start)
+            w.bind("<B1-Motion>", self.drag_move)
+            w.bind("<ButtonRelease-1>", lambda e: self.save_pos())
+        # The toplevel is in every child's bindtags, so these fire for the whole window.
+        self.root.bind("<Enter>", lambda e: self.show_bar())
+        self.root.bind("<Leave>", lambda e: self.schedule_hide())
+        # Restoring from the taskbar: Windows sends Map; GNOME only sends FocusIn.
+        self.root.bind("<Map>", self.on_map)
+        self.root.bind("<FocusIn>", self.on_map)
+
+    def frameless(self):
+        self.root.withdraw()
+        self.root.overrideredirect(True)
+        self.root.update_idletasks()
+        w, h = self.root.winfo_reqwidth(), self.root.winfo_reqheight()
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        x, y = sw - w - px(24), px(48)          # default: top right corner
+        try:
+            pos = json.loads((data_dir() / "window.json").read_text(encoding="utf-8"))
+            if 0 <= pos["x"] <= sw - px(40) and 0 <= pos["y"] <= sh - px(40):
+                x, y = int(pos["x"]), int(pos["y"])
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        self.root.geometry(f"+{x}+{y}")
+        self.root.deiconify()
+        self.root.attributes("-topmost", True)
+
+    def show_bar(self):
+        if self.hide_job:
+            self.root.after_cancel(self.hide_job)
+            self.hide_job = None
+        if self.bar_on or self.minimized:
+            return
+        self.bar_on = True
+        x, y = self.root.winfo_x(), self.root.winfo_y()
+        self.bar.pack(side="top", fill="x", before=self.card)
+        bh = px(BAR_H)
+        self.root.geometry(f"+{x}+{y - bh}" if y >= bh else f"+{x}+{y}")
+        self.bar_grew_up = y >= bh
+
+    def schedule_hide(self):
+        if self.hide_job:
+            self.root.after_cancel(self.hide_job)
+        self.hide_job = self.root.after(HIDE_MS, self.hide_bar)
+
+    def hide_bar(self, force=False):
+        self.hide_job = None
+        if not self.bar_on:
+            return
+        if not force:   # Leave also fires when moving between child widgets: only hide once truly outside
+            px_, py_ = self.root.winfo_pointerxy()
+            x, y = self.root.winfo_rootx(), self.root.winfo_rooty()
+            if x <= px_ < x + self.root.winfo_width() and y <= py_ < y + self.root.winfo_height():
+                return
+        self.bar_on = False
+        x, y = self.root.winfo_x(), self.root.winfo_y()
+        self.bar.pack_forget()
+        if self.bar_grew_up:
+            self.root.geometry(f"+{x}+{y + px(BAR_H)}")
+
+    def card_pos(self):
+        """Where the card's window sits without the bar (what gets saved)."""
+        x, y = self.root.winfo_x(), self.root.winfo_y()
+        return x, y + (px(BAR_H) if self.bar_on and self.bar_grew_up else 0)
+
+    def drag_start(self, e):
+        self.drag = (e.x_root - self.root.winfo_x(), e.y_root - self.root.winfo_y())
+
+    def drag_move(self, e):
+        dx, dy = self.drag
+        x, y = e.x_root - dx, e.y_root - dy
+        self.root.geometry(f"+{x}+{y}")
+        self.bar_grew_up = True   # after a drag, hiding the bar keeps the card where it was dropped
+
+    def save_pos(self):
+        x, y = self.card_pos()
+        try:
+            (data_dir() / "window.json").write_text(json.dumps({"x": x, "y": y}), encoding="utf-8")
+        except OSError:
+            pass
+
+    def minimize(self):
+        # A frameless window can't be minimised, so give it back its frame while it's in the taskbar.
+        self.hide_bar(force=True)
+        self.minimized = "pending"       # ignore the Map events of the steps below
+        x, y = self.root.winfo_x(), self.root.winfo_y()
+        self.root.withdraw()             # X11 window managers only see the change after a remap
+        self.root.overrideredirect(False)
+        self.root.geometry(f"+{x}+{y}")
+        self.root.deiconify()
+        self.root.after(80, self.iconify_now)
+
+    def iconify_now(self):
+        self.root.iconify()
+        self.root.after(200, lambda: setattr(self, "minimized", True))
+
+    def on_map(self, e):
+        if e.widget is not self.root or self.minimized is not True:
+            return
+        self.minimized = False
+        self.root.after(50, self.restore_frameless)
+
+    def restore_frameless(self):
+        x, y = self.root.winfo_x(), self.root.winfo_y()
+        self.root.withdraw()
+        self.root.overrideredirect(True)
+        self.root.geometry(f"+{x}+{y}")
+        self.root.deiconify()
+        self.root.attributes("-topmost", True)
+
+    def close(self):
+        self.save_pos()
+        self.root.destroy()
 
     # ---------- building ----------
     def lbl(self, parent, text="", size=10, color="ink", bold=False, font=None, **kw):
@@ -353,10 +494,30 @@ class App:
         self.dots.bind("<Configure>", lambda e: (setattr(self, "dots_key", None), self.wake()))
         return f
 
+    def open_usage(self):
+        """Opens the usage page in the default browser, off the UI thread."""
+        threading.Thread(target=webbrowser.open, args=(USAGE_URL,), daemon=True).start()
+
+    def refresh_plan(self):
+        """The ↻ button: asks plan_loop to check now, still within its minimum gap between checks."""
+        if self.plan_now.is_set():
+            return
+        left = int(self.plan_ready - time.monotonic()) + 1
+        self.plan_msg.configure(text=f"Refreshing in {left}s…" if left > 1 else "Refreshing…")
+        self.plan_msg.pack(fill="x", before=self.slot_area)
+        self.fit_card()
+        self.plan_now.set()
+
     def build_back(self):
         f = self.face()
         self.spark_back = self.header(f, "Usage", "")
         self.plan_name = self.spark_back.sub
+        for text, size, cmd, pad in (("Open usage ↗", 9, self.open_usage, 8), ("↻", 13, self.refresh_plan, 0)):
+            b = self.lbl(self.spark_back.master, text, size, "mute", cursor="hand2", padx=px(pad))
+            b.pack(side="right")
+            b.bind("<Button-1>", lambda e, cmd=cmd: cmd())
+            b.bind("<Enter>", lambda e, b=b: b.configure(fg=C["orange"]))
+            b.bind("<Leave>", lambda e, b=b: b.configure(fg=C["mute"]))
         body = tk.Frame(f, bg=C["panel"], padx=14)
         body.pack(fill="both", expand=True, pady=(0, 10))
 
@@ -438,21 +599,26 @@ class App:
         self.render_plan()
 
     def plan_loop(self):
+        fails = 0
         while True:
             self.plan_now.clear()
             last = time.monotonic()
             res = plan_usage.fetch()
+            busy = not res["ok"] and "Busy" in res["error"]
+            res = plan_usage.remember(res)   # on failure: last good numbers, labelled with their age
             res["email"] = plan_usage.account_email()
             self.plan = res
             try:
                 self.root.after(0, self.render_plan)
             except RuntimeError:          # window closed
                 return
-            # Refresh every couple of minutes (longer when Anthropic says busy), or sooner when the
-            # account changes, but never more often than PLAN_MIN_GAP_S.
-            busy = not res["ok"] and "Busy" in res["error"]
-            self.plan_now.wait(PLAN_REFRESH_S * (3 if busy else 1))
-            time.sleep(max(0.0, PLAN_MIN_GAP_S * (6 if busy else 1) - (time.monotonic() - last)))
+            # Refresh every couple of minutes (longer each time Anthropic says busy), or sooner when
+            # the account changes or ↻ is clicked, but never more often than the gap below.
+            fails = fails + 1 if busy else 0
+            gap = PLAN_MIN_GAP_S * (6 if busy else 1)
+            self.plan_ready = last + gap
+            self.plan_now.wait(min(PLAN_MAX_BACKOFF_S, PLAN_REFRESH_S * 3 * 2 ** (fails - 1)) if busy else PLAN_REFRESH_S)
+            time.sleep(max(0.0, gap - (time.monotonic() - last)))
 
     def render_plan(self):
         res = self.plan
@@ -467,7 +633,11 @@ class App:
                 slot["box"].pack_forget()
             self.fit_card()
             return
-        self.plan_msg.pack_forget()
+        if res.get("note"):
+            self.plan_msg.configure(text=res["note"])
+            self.plan_msg.pack(fill="x", before=self.slot_area)
+        else:
+            self.plan_msg.pack_forget()
         self.plan_name.configure(text=f" {res['plan']} plan" if res.get("plan") else "")
         limits = [lim for lim in res["limits"] if lim["key"] in PLAN_KEYS]
         for slot in self.slots:

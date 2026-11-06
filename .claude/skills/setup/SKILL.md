@@ -69,6 +69,19 @@ PY plan_usage.py                # plan bars (only if plan_bars was ok)
 - Anything that needs them (e.g. `/login` for the plan bars).
 - Remove later with `PY install.py --uninstall`.
 
+## Codex Odometer (optional)
+
+If the user also uses OpenAI Codex (a `~/.codex` folder exists, or they ask for it), offer the Codex meter in the same AskUserQuestion call ("Also install the Codex Odometer?"). If yes, run the same steps inside `codex/`:
+
+```
+PY codex/doctor.py                       # all [ok]; "Codex session logs: fail" just means Codex has not run yet
+PY codex/install.py [--no-desktop] [--autostart]
+PY codex/install.py --launch
+PY codex/token_calc.py --today
+```
+
+It is a separate app (own shortcut, data folder `codex-odometer`), so both can run side by side. It never reads Codex's sign-in.
+
 ## Rules
 
 - Never print, copy or send the Claude Code sign-in token (`.credentials.json` / Keychain). `doctor.py` only reports whether it exists.

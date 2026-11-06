@@ -161,6 +161,35 @@ def fetch(timeout=10):
     return {"ok": True, "plan": plan.capitalize() if isinstance(plan, str) else None, "limits": limits}
 
 
+def remember(res):
+    """Keeps the last good reading in plan_last.json (percentages only, never the sign-in). When a
+    check fails, returns that reading with the reason and its age, so the bars stay on the card.
+    Limits that have reset since, and readings from another account, are not shown."""
+    from token_calc import data_dir
+    path = data_dir() / "plan_last.json"
+    who = account()[0]
+    try:
+        if res["ok"]:
+            limits = [{**lim, "resets": lim["resets"].isoformat() if lim["resets"] else None} for lim in res["limits"]]
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"who": who, "plan": res.get("plan"), "at": time.time(), "limits": limits}), encoding="utf-8")
+            tmp.replace(path)
+            return res
+        last = json.loads(path.read_text(encoding="utf-8"))
+        if last["who"] != who:
+            return res
+        now = datetime.now().astimezone()
+        limits = [{**lim, "resets": _when(lim["resets"])} for lim in last["limits"]]
+        limits = [lim for lim in limits if not lim["resets"] or lim["resets"] > now]
+        if not limits:
+            return res
+        mins = max(0, int((time.time() - last["at"]) / 60))
+        age = f"{mins}m" if mins < 60 else f"{mins // 60}h {mins % 60}m"
+        return {"ok": True, "plan": last.get("plan"), "limits": limits, "note": f"{res['error']} · {age} old"}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return res
+
+
 if __name__ == "__main__":
     from token_calc import utf8_stdout
     utf8_stdout()

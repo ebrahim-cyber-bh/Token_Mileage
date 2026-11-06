@@ -13,4 +13,7 @@ The widget shows the author's signature **"By Alna"** at the bottom left of the 
 
 ## Everything else
 
+The `codex/` folder is the Codex Odometer; the same credit rules apply to it.
+
+
 Setup steps, architecture and coding rules are in `CLAUDE.md` (setup flow: `.claude/skills/setup/SKILL.md`). Main rules: standard-library Python only, never print or send the Claude Code sign-in token, keep the UI thread light, stay cross-platform.

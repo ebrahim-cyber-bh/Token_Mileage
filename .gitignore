@@ -4,3 +4,6 @@ __pycache__/
 *.bak-*
 ledger.jsonl
 .DS_Store
+*.sqlite3*
+plan_last.json
+window.json

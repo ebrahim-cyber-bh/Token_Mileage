@@ -49,15 +49,20 @@ Claude Code sign-in ──► plan_usage.fetch() ──► api.anthropic.com/api
   - `SCALE` / `px()` scale fixed pixel sizes to the screen DPI (fonts scale by themselves), so 125-200% Windows displays don't clip.
   - `memory()` / `storage()` give RAM and disk (home drive) per OS. `size_line()` shows *used of total*, red above 90%.
   - `credit()` draws the author signature (see "Credit").
+  - The window is frameless (`overrideredirect`). `build_bar()` draws its own bar (drag, minimise, close) that shows only while the mouse is over the widget; the window grows upward so the card stays still. The last position is saved in `data_dir()/window.json`. Minimise gives the frame back while it's in the taskbar and `on_map()` removes it on restore (GNOME sends only FocusIn, Windows sends Map).
 - **plan_usage.py**: reads Claude Code's OAuth sign-in (`~/.claude/.credentials.json`, or the macOS Keychain item `Claude Code-credentials`) and calls the usage endpoint with `anthropic-beta: oauth-2025-04-20`. Returns `{"ok", "plan", "limits":[{key,label,pct,resets}]}` or `{"ok": False, "error"}`. `account_email()` reads the signed-in email from `~/.claude.json` (`oauthAccount.emailAddress`); the back card shows it next to "PLAN USAGE".
 - **doctor.py**: requirement checks for setup (`--json` for Claude). Never prints the token.
 - **install.py**: shortcuts per OS (Linux `.desktop` + app menu, macOS `.command` + LaunchAgent, Windows `.lnk` on the desktop + Start Menu + Startup folder), `--owner`, `--autostart`, `--no-desktop`, `--status`, `--uninstall`, `--launch`.
+
+## Codex Odometer (`codex/`)
+
+A separate copy for OpenAI Codex with the same UI (mint accent, ⌘ glyph). It reads only local logs in `$CODEX_HOME` (default `~/.codex`), stores a SQLite ledger in `codex-odometer`, and never reads `auth.json` or calls OpenAI. Plan bars are the last `rate_limits` snapshot Codex logged (`has_limits()` skips empty `premium` entries, `recover_limits()` finds the last real one). `USAGE_URL` = chatgpt.com/settings/usage. Run its tests with `cd codex && python3 -m unittest -v`. When a feature applies to both meters, change both. The credit rules above apply to `codex/` too.
 
 ## Rules when changing it
 
 - **Never print, log, save or send the OAuth token** anywhere except `api.anthropic.com`. Never refresh it here: refreshing rotates tokens and can sign Claude Code out. If it has expired, tell the user to open Claude Code.
 - The usage endpoint is **not a public API**. Keep every field access defensive. Unknown or missing data must show "Usage not available", never crash the widget.
-- Poll the usage endpoint every 120 s, and back off on HTTP 429. The one exception is an account switch: `data_loop` checks only the file dates of `~/.claude.json` and `.credentials.json` (`plan_usage.sign_in_stamp()`); when the account id or sign-in changes it shows the new email at once and wakes `plan_loop`, which still never calls more often than every `PLAN_MIN_GAP_S` (10 s).
+- Poll the usage endpoint every 120 s. On HTTP 429 back off (6, 12, 24, then 30 min) and keep showing the last good reading from `plan_usage.remember()` (`plan_last.json`) with its age. The ↻ button on the back card wakes `plan_loop` but stays inside the same minimum gap (60 s while busy). The other exception is an account switch: `data_loop` checks only the file dates of `~/.claude.json` and `.credentials.json` (`plan_usage.sign_in_stamp()`); when the account id or sign-in changes it shows the new email at once and wakes `plan_loop`, which still never calls more often than every `PLAN_MIN_GAP_S` (10 s).
 - Everything else is local: tokens come from log files on disk, and nothing calls a Claude model, so the odometer never uses Claude credits or tokens.
 - **Keep it light.** The UI thread only draws. File scans, network and sums run in threads. No animation loop runs while nothing moves. Target: about 1-2% of one CPU core. Measure before and after any UI change.
 - Token totals must stay deduplicated, and the ledger must only grow (it is the history after Claude Code deletes old logs).
@@ -79,4 +84,5 @@ python3 doctor.py                # all [ok], credit intact
 python3 token_calc.py --today
 python3 plan_usage.py            # plan bars in the terminal (needs Claude Code signed in)
 python3 token_popup.py           # flip with ⇄ and check both faces
+(cd codex && python3 -m unittest -v && python3 doctor.py)
 ```

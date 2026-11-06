@@ -9,11 +9,13 @@ By Alna (Ebrahim Alnasser).
 | ![Front of the odometer](screenshots/front.png) | ![Back of the odometer](screenshots/back.png) |
 
 - **Front:** rolling digit drums showing every token Claude Code has used on this device, in full. There is one dot per open Claude Code terminal: **orange pulsing** = working, **green glow** = finished. Hover a dot to see the session name. Bottom right: RAM and disk used of total, in red above 90%.
-- **Back** (flip with ⇄): **plan usage**, the same bars `/usage` shows for the account signed in to Claude Code (current session and this week for all models), with % used and reset time, and the email of the signed-in account. Bars turn red at 90%.
+- **Back** (flip with ⇄): **plan usage**, the same bars `/usage` shows for the account signed in to Claude Code (current session and this week for all models), with % used and reset time, and the email of the signed-in account. Bars turn red at 90%. **Open usage ↗** opens claude.ai/settings/usage in your browser, and **↻** checks again now. If Anthropic is busy, the card keeps the last good numbers and shows how old they are.
 - **Light:** it sleeps when nothing changes and uses about 1-2% of one CPU core while running.
 - **Command line:** a full report by day, project, model and session, with API-price estimates and an optional HTML report.
 
 Only the Python standard library is needed (Python 3.9+ with Tk). Works on Linux, macOS and Windows.
+
+**Codex too:** the [`codex/`](codex/) folder has a separate Codex Odometer (mint green) for OpenAI Codex: the same odometer, session dots and back card, read from Codex's local logs in `~/.codex`. It installs as its own app, so you can run both side by side. See [codex/README.md](codex/README.md).
 
 ## Set up with Claude Code (easiest)
 
@@ -81,9 +83,20 @@ Costs are estimates at Anthropic API list prices. On a Pro/Max subscription this
 | `doctor.py` | Checks what this computer needs before setup |
 | `icon.svg` | App icon |
 | `screenshots/` | Front and back of the widget |
+| `codex/` | The separate Codex Odometer (own installer, doctor and tests) |
 | `CLAUDE.md`, `.claude/skills/setup/` | Notes and the `/setup` flow for Claude Code |
 | `AGENTS.md` | Rules for other AI coding tools |
 | `LICENSE` | MIT with an attribution clause |
+
+## Codex Odometer
+
+```bash
+cd codex
+python3 doctor.py                # Windows: py doctor.py
+python3 install.py --launch      # shortcuts + open it (add --autostart to start at login)
+```
+
+It never reads Codex's sign-in. The back card shows the last plan-limit snapshot Codex wrote to its logs (not live); **Open usage ↗** opens chatgpt.com/settings/usage for live figures.
 
 ## License
 
