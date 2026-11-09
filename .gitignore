@@ -9,3 +9,6 @@ plan_last.json
 window.json
 site/downloads/
 dist/
+
+.vercel
+.env*

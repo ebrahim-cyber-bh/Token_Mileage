@@ -1,8 +1,36 @@
-# Token Mileage: Claude Code Odometer
+# Token Mileage: Claude, Codex, and Chrome
 
 A live token counter for Claude Code, styled like a classic car odometer in Claude Code's colours. It sits on your desktop and shows how many tokens you have used, which sessions are working, and how much of your plan you have left.
 
 By Alna (Ebrahim Alnasser).
+
+Choose the tool for where you work:
+
+| Tool | Where it runs | Setup |
+|---|---|---|
+| Claude Code Odometer | Desktop widget for Claude Code | [Desktop setup](#set-up-by-hand) |
+| Codex Odometer | Separate desktop widget for Codex | [Codex setup](codex/README.md) |
+| Claude Chrome extension | Usage inside Claude.ai's message box and sidebar | [Chrome setup](chrome-extension/README.md) |
+
+## Codex Odometer
+
+The separate mint-green meter is included in [`codex/`](codex/), with its own installer, local ledger, diagnostics, and tests. It runs alongside the Claude Code meter and requires no API key.
+
+| Codex token odometer | Codex plan usage |
+|---|---|
+| ![Codex token odometer](screenshots/codex-front.png) | ![Codex recorded plan usage](screenshots/codex-back.png) |
+
+These existing Codex screenshots contain no account identifiers or credentials. The back image shows the previous layout; the current compact card removes the recorded-age line. Limits still come from local log snapshots. Use **Open usage ↗** for current account figures.
+
+## Claude Chrome extension
+
+Session and weekly percentages, progress bars, and reset countdowns appear inside the bottom of Claude's message box. The text-only **© By Alna** credit sits below the box. A second usage display appears below Projects in the expanded sidebar.
+
+![Claude Chrome extension with inline usage and credit below the message box](screenshots/claude-chrome-extension.png)
+
+Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select `chrome-extension/`. For subsequent updates, reload the extension and refresh all open Claude tabs. No build, API key, or desktop meter is required. Usage requests stay within your signed-in Claude.ai session; see [privacy and limitations](chrome-extension/README.md#behavior-and-privacy).
+
+## Desktop meters
 
 | Front: the odometer | Back: plan usage (flip with ⇄) |
 |---|---|
@@ -83,6 +111,7 @@ Costs are estimates at Anthropic API list prices. On a Pro/Max subscription this
 | `doctor.py` | Checks what this computer needs before setup |
 | `icon.svg` | App icon |
 | `screenshots/` | Front and back of the widget |
+| `chrome-extension/` | Claude.ai Chrome extension, icons, preview, tests and integrity check |
 | `codex/` | The separate Codex Odometer (own installer, doctor and tests) |
 | `updater.py` | Daily version check and self-update (same file in `codex/`) |
 | `site/`, `build_release.py`, `vercel.json` | Download page, the zips Vercel builds on deploy |
@@ -92,7 +121,7 @@ Costs are estimates at Anthropic API list prices. On a Pro/Max subscription this
 
 ## Download page and updates
 
-- The download page is `site/`, hosted on Vercel at https://token-mileage.ebrahim-alnasser.com. On every deploy Vercel runs `build_release.py` (see `vercel.json`) and serves `downloads/token-mileage-claude.zip` and `downloads/token-mileage-codex.zip`, so the downloads always match the code on `main`.
+- The download page is `site/`, hosted on Vercel at https://token-mileage.ebrahim-alnasser.com. On every deploy Vercel runs `build_release.py` (see `vercel.json`) and serves `downloads/token-mileage-claude.zip` and `downloads/token-mileage-codex.zip`, and `downloads/token-mileage-chrome-extension.zip`, so the downloads always match the code on `main`.
 - **Release a version:** set the same number in `VERSION`, `codex/VERSION` and `site/version.json`, commit and push to `main`. Vercel redeploys on its own.
 - **Updates:** once a day each odometer reads `version.json` from the site (it sends nothing about you). When a newer version is out, the back card shows **Update to …**; clicking it runs `install.py --update`, which downloads the zip from the site (or runs `git pull` in a clone) and restarts the widget. History is kept. Turn the check off with `install.py --no-update-check`.
 
