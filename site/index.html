@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Token Mileage</title>
-<meta name="description" content="Desktop odometers for Claude Code and Codex token usage. Free download for Windows and Ubuntu.">
+<meta name="description" content="Desktop token odometers for Claude Code and Codex, plus a Claude.ai usage extension for Chrome. Free downloads and simple setup guides.">
 <link rel="icon" href="img/icon.png">
 <style>
   :root {
@@ -21,7 +21,7 @@
   p { margin: 0 0 12px; }
   a { color: inherit; }
   .lead { color: var(--mute); max-width: 620px; margin-top: 8px; }
-  .apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 32px; }
+  .apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; margin-top: 32px; }
   .app { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
   .app img { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); margin-bottom: 8px; }
   .app p { color: var(--mute); font-size: .95rem; }
@@ -38,6 +38,8 @@
                 border-radius: var(--radius); font: .85rem/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
   .copy { position: absolute; top: 8px; inset-inline-end: 8px; min-height: 36px; padding: 0 14px; border-radius: 8px;
           border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-size: .85rem; cursor: pointer; }
+  .inline-copy { padding: 5px 10px; margin: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font: inherit; font-size: .85rem; cursor: pointer; }
+  .inline-copy:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .copy:hover { border-color: var(--mute); }
   .copy:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   section { margin-top: 48px; }
@@ -57,8 +59,8 @@
 <body>
 <main>
   <h1>Token Mileage</h1>
-  <p class="lead">A small desktop odometer that counts the tokens you use in Claude Code or Codex, shows which sessions are working, and how much of your plan is left. Free, open source, runs on your own computer.</p>
-  <p class="small">Version <span id="version">1.1.0</span> · Windows and Ubuntu (macOS works too) · By Alna</p>
+  <p class="lead">Track Claude Code or Codex tokens with a desktop odometer, or see your Claude.ai plan usage inside Chrome. Choose your tool below. Free and open source.</p>
+  <p class="small">Version <span id="version">1.2.0</span> · Windows and Ubuntu (macOS works too) · By Alna</p>
 
   <div class="apps">
     <div class="app claude">
@@ -71,14 +73,43 @@
     <div class="app codex">
       <img src="img/codex-front.png" alt="Codex Odometer showing the token count" width="420" height="173">
       <img src="img/codex-back.png" alt="Codex Odometer back card with recorded plan limits" width="420" height="173">
+      <p class="small">Back image shows the earlier layout; the current card omits the recorded-age line.</p>
       <h2>Codex Odometer</h2>
       <p>Tokens Codex used on this computer, recent sessions, and the last plan limits Codex recorded. It never reads your sign-in.</p>
       <a class="btn" href="downloads/token-mileage-codex.zip" download>Download for Codex</a>
     </div>
+    <div class="app claude extension">
+      <img src="img/chrome-extension.png" alt="Claude usage inside the message box, with © By Alna below it" width="1039" height="283">
+      <h2>Claude.ai Chrome extension</h2>
+      <p>See session and weekly usage bars and reset countdowns inside Claude.ai's message box and sidebar.</p>
+      <p>No Python or desktop widget needed. Use Chrome on a computer.</p>
+      <a class="btn" href="downloads/token-mileage-chrome-extension.zip" download>Download Chrome extension</a>
+      <p class="small"><a href="#chrome-setup">How to add it to Chrome — 5 simple steps</a></p>
+    </div>
   </div>
 
+  <section id="chrome-setup" aria-labelledby="chrome-heading">
+    <h2 id="chrome-heading">Add the extension to Chrome</h2>
+    <p>This download uses Chrome's manual installation. A website cannot add it automatically; you complete the steps below once.</p>
+    <ol>
+      <li><a href="downloads/token-mileage-chrome-extension.zip" download>Download the extension ZIP</a> and extract it into a folder you will keep, such as <code>Documents/Token-Mileage-Chrome</code>.</li>
+      <li>Copy <code id="chrome-address">chrome://extensions</code> into Chrome's address bar and press Enter. <button class="inline-copy" data-for="chrome-address" type="button">Copy address</button></li>
+      <li>Turn on <strong>Developer mode</strong> at the top right.</li>
+      <li>Click <strong>Load unpacked</strong>. Select the extracted folder containing <code>manifest.json</code>, then click <strong>Select Folder</strong> or <strong>Open</strong>.</li>
+      <li>Open <a href="https://claude.ai/">Claude.ai</a>, sign in, and refresh the page. Usage appears inside the bottom of the message box, with © By Alna below it, and under Projects when the sidebar is expanded.</li>
+    </ol>
+    <p class="small">Select the extracted folder, not the ZIP. Keep that folder in place. If you see duplicate usage displays, disable your other Claude usage extension.</p>
+    <details>
+      <summary>Updates, removal and automatic installation</summary>
+      <p><strong>Update:</strong> extract the new download into the same folder, replacing the old files. On <code>chrome://extensions</code>, click this extension's reload button, then refresh your Claude tabs.</p>
+      <p><strong>Remove:</strong> on <code>chrome://extensions</code>, find the extension and click <strong>Remove</strong>.</p>
+      <p><strong>Automatic installation:</strong> administrators can configure this for managed work or school browsers. For personal Chrome, a Chrome Web Store release would provide an Add to Chrome button and automatic updates; you would still confirm the first installation. This download is an unpacked extension, not a Web Store listing.</p>
+      <p class="small"><a href="https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked">Google's manual setup instructions</a> · <a href="https://support.google.com/chrome/a/answer/6306504">Managed browser installation</a></p>
+    </details>
+  </section>
+
   <section>
-    <h2>Let your AI install it</h2>
+    <h2>Let your AI install the desktop meter</h2>
     <p>Copy a prompt and paste it into Claude Code, Codex or another coding assistant running on the computer. It downloads, checks and installs everything for you.</p>
     <h3>Claude Code Odometer</h3>
     <div class="prompt"><pre id="p-claude">Install the Claude Code Odometer (Token Mileage) on this computer for me.
@@ -103,7 +134,7 @@ Do not change the "By Alna" credit or the LICENSE.</pre><button class="copy" dat
   </section>
 
   <section>
-    <h2>Install it yourself</h2>
+    <h2>Install a desktop meter yourself</h2>
     <p class="small">One zip works on every system. You need Python 3.9 or newer.</p>
     <div class="tabs" role="tablist">
       <button role="tab" id="tab-win" aria-selected="true" aria-controls="win">Windows</button>
@@ -129,7 +160,7 @@ Do not change the "By Alna" credit or the LICENSE.</pre><button class="copy" dat
   </section>
 
   <section>
-    <h2>Updates</h2>
+    <h2>Desktop meter updates</h2>
     <p>Once a day the odometer checks this site for a new version number. When there is one, the back of the card shows <strong>Update to …</strong>: click it and it updates itself and restarts. Your usage history is kept. You can also run <code>install.py --update</code> yourself.</p>
     <p class="small">The check only downloads a version number; it sends none of your usage. Turn it off with <code>install.py --no-update-check</code>.</p>
   </section>
@@ -137,6 +168,7 @@ Do not change the "By Alna" credit or the LICENSE.</pre><button class="copy" dat
   <section>
     <h2>Privacy</h2>
     <p>Token counts come from log files on your own computer and never leave it. The Claude meter asks Anthropic for your plan usage with Claude Code's own sign-in, the same as <code>/usage</code>. The Codex meter makes no requests about your account at all.</p>
+    <p>The Chrome extension requests usage from Claude.ai using your existing signed-in session. It does not read message contents or send your usage to third parties. It uses an undocumented Claude endpoint, so site changes can interrupt it.</p>
   </section>
 
   <footer>
@@ -157,12 +189,13 @@ Do not change the "By Alna" credit or the LICENSE.</pre><button class="copy" dat
   tabs.forEach(t => t.addEventListener('click', () => show(t)));
   if (/Linux|X11/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent)) show(tabs[1]);
   // Copy buttons for the AI prompts.
-  document.querySelectorAll('.copy').forEach(b => b.addEventListener('click', async () => {
+  document.querySelectorAll('.copy, .inline-copy').forEach(b => b.addEventListener('click', async () => {
+    const originalLabel = b.textContent;
     const text = document.getElementById(b.dataset.for).textContent;
     try { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; }
     catch { const r = document.createRange(); r.selectNodeContents(document.getElementById(b.dataset.for));
             getSelection().removeAllRanges(); getSelection().addRange(r); b.textContent = 'Press Ctrl+C'; }
-    setTimeout(() => b.textContent = 'Copy', 2000);
+    setTimeout(() => b.textContent = originalLabel, 2000);
   }));
   // Current version from version.json (the same file the odometer checks).
   fetch('version.json', { cache: 'no-store' }).then(r => r.json())

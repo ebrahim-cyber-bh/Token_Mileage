@@ -2,13 +2,29 @@
 
 A slim usage line inside the bottom of Claude's message composer, with © By Alna directly below the message box. Session and weekly percentages, longer warm orange progress bars, and reset countdowns align to the right. A second usage section appears below Projects in the expanded left sidebar, sharing the same live reading. No floating panel, toolbar popup, ads, contact links, or tracking. Adapts to light and dark themes through inherited text color.
 
-## Install or update
+## Install in Chrome — 5 simple steps
 
-1. Download this repository and select its `chrome-extension/` folder (or extract `token-mileage-chrome-extension.zip`). Open `chrome://extensions` and enable Developer mode.
-2. If already installed, click the extension's reload arrow, then refresh every open Claude tab. Otherwise choose Load unpacked and select the folder containing `manifest.json`.
-3. Reload your Claude tab. Disable the old third-party usage extension to avoid duplicate displays.
+Use Chrome on a computer. No Python, API key or desktop widget is needed.
 
-No build required. The source checkout includes `preview.html` with labeled sample data.
+1. [Download the extension ZIP](https://token-mileage.ebrahim-alnasser.com/downloads/token-mileage-chrome-extension.zip). Extract it into a folder you will keep, such as `Documents/Token-Mileage-Chrome`. If using the source repository, use its `chrome-extension/` folder instead.
+2. Paste `chrome://extensions` into Chrome's address bar and press Enter.
+3. Turn on **Developer mode** at the top right.
+4. Click **Load unpacked** and select the extracted folder containing `manifest.json`. Choose **Select Folder** or **Open**. Select the folder, not the ZIP.
+5. Open [Claude.ai](https://claude.ai/), sign in and refresh the page. Usage appears inside the bottom of the message box, with © By Alna below it, and under Projects in the expanded sidebar.
+
+Keep the extracted folder in place. If usage appears twice, disable the other Claude usage extension.
+
+**Update:** extract the latest ZIP into the same folder, replacing the old files. Open `chrome://extensions`, click this extension's reload button, then refresh every open Claude tab.
+
+**Remove:** open `chrome://extensions`, find the extension and click **Remove**.
+
+### Can it install automatically?
+
+A normal website cannot silently install a Chrome extension. This download requires the manual steps above. A future Chrome Web Store listing would offer **Add to Chrome** and automatic updates, but the user would still confirm the initial installation. Administrators can configure automatic installation for managed work or school browsers; that is separate from personal Chrome setup.
+
+Official guides: [load an unpacked extension](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked), [managed automatic installation](https://support.google.com/chrome/a/answer/6306504).
+
+The source checkout includes `preview.html` with labeled sample data.
 
 ## Behavior and privacy
 

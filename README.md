@@ -8,29 +8,11 @@ Choose the tool for where you work:
 
 | Tool | Where it runs | Setup |
 |---|---|---|
-| Claude Code Odometer | Desktop widget for Claude Code | [Desktop setup](#set-up-by-hand) |
-| Codex Odometer | Separate desktop widget for Codex | [Codex setup](codex/README.md) |
-| Claude Chrome extension | Usage inside Claude.ai's message box and sidebar | [Chrome setup](chrome-extension/README.md) |
+| 1. Claude Code Odometer | Desktop widget for Claude Code | [Claude setup](#set-up-with-claude-code-easiest) |
+| 2. Codex Odometer | Separate desktop widget for Codex | [Codex setup](#2-codex-odometer) |
+| 3. Claude Chrome extension | Usage inside Claude.ai's message box and sidebar | [Chrome setup](chrome-extension/README.md) |
 
-## Codex Odometer
-
-The separate mint-green meter is included in [`codex/`](codex/), with its own installer, local ledger, diagnostics, and tests. It runs alongside the Claude Code meter and requires no API key.
-
-| Codex token odometer | Codex plan usage |
-|---|---|
-| ![Codex token odometer](screenshots/codex-front.png) | ![Codex recorded plan usage](screenshots/codex-back.png) |
-
-These existing Codex screenshots contain no account identifiers or credentials. The back image shows the previous layout; the current compact card removes the recorded-age line. Limits still come from local log snapshots. Use **Open usage ↗** for current account figures.
-
-## Claude Chrome extension
-
-Session and weekly percentages, progress bars, and reset countdowns appear inside the bottom of Claude's message box. The text-only **© By Alna** credit sits below the box. A second usage display appears below Projects in the expanded sidebar.
-
-![Claude Chrome extension with inline usage and credit below the message box](screenshots/claude-chrome-extension.png)
-
-Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select `chrome-extension/`. For subsequent updates, reload the extension and refresh all open Claude tabs. No build, API key, or desktop meter is required. Usage requests stay within your signed-in Claude.ai session; see [privacy and limitations](chrome-extension/README.md#behavior-and-privacy).
-
-## Desktop meters
+## 1. Claude Code Odometer
 
 | Front: the odometer | Back: plan usage (flip with ⇄) |
 |---|---|
@@ -43,9 +25,7 @@ Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, 
 
 Only the Python standard library is needed (Python 3.9+ with Tk). Works on Linux, macOS and Windows.
 
-**Codex too:** the [`codex/`](codex/) folder has a separate Codex Odometer (mint green) for OpenAI Codex: the same odometer, session dots and back card, read from Codex's local logs in `~/.codex`. It installs as its own app, so you can run both side by side. See [codex/README.md](codex/README.md).
-
-## Set up with Claude Code (easiest)
+### Set up with Claude Code (easiest)
 
 ```bash
 git clone https://github.com/ebrahim-cyber-bh/Token_Mileage.git
@@ -55,7 +35,7 @@ claude
 
 Then say **"set this up"** (or type `/setup`). Claude Code checks your computer (Python, Tk, Claude Code sign-in), asks a few questions (your name for reports, shortcuts, start at login) and installs and opens the odometer. It works the same on Windows, macOS and Linux.
 
-## Set up by hand
+### Set up by hand
 
 ```bash
 python3 doctor.py                          # checks what this computer needs
@@ -69,7 +49,7 @@ python3 install.py --uninstall             # remove shortcuts (keeps your histor
 - **Linux:** if Tk is missing, `sudo apt install python3-tk`.
 - **macOS:** Python from python.org includes Tk (with Homebrew: `brew install python-tk`).
 
-## How the numbers stay accurate
+### How the numbers stay accurate
 
 - It reads Claude Code's own logs (`~/.claude/projects`, or `$CLAUDE_CONFIG_DIR/projects`), the same data Claude Code records for every reply.
 - Each reply is written to the log several times while it streams. Entries are merged by message id so nothing is counted twice. Without this merge, totals would be about 2× too high.
@@ -81,14 +61,14 @@ python3 install.py --uninstall             # remove shortcuts (keeps your histor
 - Live status comes from Claude Code's session files (`~/.claude/sessions`).
 - Each device counts its own usage. Token data is never uploaded anywhere.
 
-## Plan usage (the bars)
+### Plan usage (the bars)
 
 - It uses Claude Code's own sign-in on this device (`~/.claude/.credentials.json`, or the Keychain on macOS) and asks `api.anthropic.com` for the account's limits every 2 minutes. The sign-in is never printed, saved or sent anywhere else.
 - If the sign-in has expired, open Claude Code once and the bars come back. The odometer never refreshes the sign-in itself, so it can't sign Claude Code out.
 - It uses the same endpoint as Claude Code's `/usage`, which is **not a public API**. If it changes, the card says "Usage not available" and everything else keeps working.
 - To check from a terminal: `python3 plan_usage.py`
 
-## Command-line report
+### Command-line report
 
 ```bash
 python3 token_calc.py              # all time, with API-price estimates
@@ -99,6 +79,34 @@ python3 token_calc.py --html       # also writes report.html (git-ignored: it ho
 ```
 
 Costs are estimates at Anthropic API list prices. On a Pro/Max subscription this is the API-equivalent value of your usage, not your bill.
+
+## 2. Codex Odometer
+
+The separate mint-green meter is included in [`codex/`](codex/), with its own installer, local ledger, diagnostics, and tests. It runs alongside the Claude Code meter and requires no API key.
+
+| Codex token odometer | Codex plan usage |
+|---|---|
+| ![Codex token odometer](screenshots/codex-front.png) | ![Codex recorded plan usage](screenshots/codex-back.png) |
+
+These existing Codex screenshots contain no account identifiers or credentials. The back image shows the previous layout; the current compact card removes the recorded-age line. Limits still come from local log snapshots. Use **Open usage ↗** for current account figures.
+
+### Set up
+
+```bash
+cd codex
+python3 doctor.py                # Windows: py doctor.py
+python3 install.py --launch      # shortcuts + open it (add --autostart to start at login)
+```
+
+It never reads Codex's sign-in. The back card shows the last plan-limit snapshot Codex wrote to its logs (not live); **Open usage ↗** opens chatgpt.com/settings/usage for live figures. Full guide: [codex/README.md](codex/README.md).
+
+## 3. Claude Chrome extension
+
+Session and weekly percentages, progress bars, and reset countdowns appear inside the bottom of Claude's message box. The text-only **© By Alna** credit sits below the box. A second usage display appears below Projects in the expanded sidebar.
+
+![Claude Chrome extension with inline usage and credit below the message box](screenshots/claude-chrome-extension.png)
+
+Download and extract the extension ZIP, open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select the folder containing `manifest.json` (or select `chrome-extension/` in this repository). A website cannot silently install it; see the [five-step Chrome guide](chrome-extension/README.md#install-in-chrome--5-simple-steps). For subsequent updates, reload the extension and refresh all open Claude tabs. No build, API key, or desktop meter is required. Usage requests stay within your signed-in Claude.ai session; see [privacy and limitations](chrome-extension/README.md#behavior-and-privacy).
 
 ## Files
 
@@ -124,16 +132,6 @@ Costs are estimates at Anthropic API list prices. On a Pro/Max subscription this
 - The download page is `site/`, hosted on Vercel at https://token-mileage.ebrahim-alnasser.com. On every deploy Vercel runs `build_release.py` (see `vercel.json`) and serves `downloads/token-mileage-claude.zip` and `downloads/token-mileage-codex.zip`, and `downloads/token-mileage-chrome-extension.zip`, so the downloads always match the code on `main`.
 - **Release a version:** set the same number in `VERSION`, `codex/VERSION` and `site/version.json`, commit and push to `main`. Vercel redeploys on its own.
 - **Updates:** once a day each odometer reads `version.json` from the site (it sends nothing about you). When a newer version is out, the back card shows **Update to …**; clicking it runs `install.py --update`, which downloads the zip from the site (or runs `git pull` in a clone) and restarts the widget. History is kept. Turn the check off with `install.py --no-update-check`.
-
-## Codex Odometer
-
-```bash
-cd codex
-python3 doctor.py                # Windows: py doctor.py
-python3 install.py --launch      # shortcuts + open it (add --autostart to start at login)
-```
-
-It never reads Codex's sign-in. The back card shows the last plan-limit snapshot Codex wrote to its logs (not live); **Open usage ↗** opens chatgpt.com/settings/usage for live figures.
 
 ## License
 
