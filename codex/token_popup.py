@@ -528,7 +528,7 @@ class App:
         # Plan limits, like /usage: label, "% used · resets …", and a bar.
         top = tk.Frame(body, bg=C["panel"])
         top.pack(fill="x")
-        self.lbl(top, "RECORDED PLAN USAGE", 8, "mute", font=MONO).pack(side="left")
+        self.lbl(top, "PLAN USAGE", 8, "mute", font=MONO).pack(side="left")
         self.email = self.lbl(top, "", 8, "mute", font=MONO)      # signed-in account
         self.email.pack(side="right")
         self.plan_msg = self.lbl(body, "Loading…", 9, "mute", font=MONO, anchor="w")
@@ -633,8 +633,8 @@ class App:
                 slot["box"].pack_forget()
             self.fit_card()
             return
-        self.plan_msg.configure(text=res.get("note", ""))
-        self.plan_msg.pack(fill="x", before=self.slot_area)
+        self.plan_msg.configure(text="")
+        self.plan_msg.pack_forget()
         self.plan_name.configure(text=f" {res['plan']} plan" if res.get("plan") else "")
         limits = [lim for lim in res["limits"] if lim["key"] in PLAN_KEYS]
         for slot in self.slots:

@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Claude \u00b7 Usage, quietly",
+  "version": "1.3.9",
+  "description": "Warm orange usage meters inside the Claude composer and under Projects in the sidebar. By Alna.",
+  "host_permissions": [
+    "https://claude.ai/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "ui.js",
+        "content.js"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "ui.css",
+        "icons/icon-32.png"
+      ],
+      "matches": [
+        "https://claude.ai/*"
+      ]
+    }
+  ],
+  "author": "Alna",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}
